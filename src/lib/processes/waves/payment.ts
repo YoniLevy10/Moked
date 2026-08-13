@@ -6,14 +6,19 @@ export function handlePayment(ctx: ProcessContext): ProcessResult {
     ctx.conversation.quote?.amountIls ??
     ctx.tenant.pricing[0]?.priceIls ??
     0;
-  const provider = ctx.tenant.integrations.paymentsProvider;
+  let provider = ctx.tenant.integrations.paymentsProvider;
+
+  // In demo WhatsApp mode, auto-use demo PSP so Wave D is testable.
+  if (provider === "none" && ctx.tenant.whatsapp.mode === "demo") {
+    provider = "demo";
+  }
 
   if (provider === "none") {
     return {
       handled: true,
       replies: [
         {
-          body: "גבייה עדיין לא מחוברת. בעל העסק ישלח קישור תשלום ידנית.",
+          body: "גבייה עדיין לא מחוברת. חברו ספק (או השאירו demo) במסך חיבורים.",
           processKey: "payment",
         },
       ],
@@ -34,6 +39,10 @@ export function handlePayment(ctx: ProcessContext): ProcessResult {
         conversationPatch: {
           payment: { ...ctx.conversation.payment, status: "paid" },
           activeProcess: undefined,
+          processState: {
+            ...ctx.conversation.processState,
+            paymentDone: true,
+          },
         },
         events: ["payment.paid"],
       };
@@ -61,7 +70,7 @@ export function handlePayment(ctx: ProcessContext): ProcessResult {
     handled: true,
     replies: [
       {
-        body: `לסיום — קישור לתשלום מאובטח (₪${amount}):\n${link.url}\n\nאחרי התשלום השב/י "שילמתי".`,
+        body: `לסיום — קישור לתשלום (₪${amount}):\n${link.url}\n\nאחרי התשלום השב/י "שילמתי".`,
         processKey: "payment",
       },
     ],

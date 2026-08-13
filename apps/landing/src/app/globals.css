@@ -140,6 +140,17 @@ body {
   background: var(--moked-deep);
 }
 
+.cta.secondary {
+  background: #fff;
+  color: var(--moked-deep);
+  border: 1px solid rgba(8, 122, 85, 0.35);
+  margin-top: 0.5rem;
+}
+
+.cta.secondary:hover:not(:disabled) {
+  background: rgba(8, 122, 85, 0.08);
+}
+
 .skip {
   display: block;
   width: 100%;

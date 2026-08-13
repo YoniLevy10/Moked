@@ -92,6 +92,12 @@ function runActiveProcess(
   if (active === "booking" && enabled(tenant, "booking")) {
     return handleBooking(ctx);
   }
+  if (active === "reminders" && enabled(tenant, "reminders")) {
+    return handleReminderReply(ctx);
+  }
+  if (active === "retention" && enabled(tenant, "retention")) {
+    return handleRetention(ctx);
+  }
   if (active === "quote" && enabled(tenant, "quote")) {
     const result = handleQuote(ctx);
     if (
@@ -138,7 +144,11 @@ function runActiveProcess(
   }
 
   if (enabled(tenant, "reminders") && conversation.booking?.confirmedAt) {
-    const reminder = handleReminderReply(inboundText);
+    const reminder = handleReminderReply({
+      tenant,
+      conversation,
+      inboundText,
+    });
     if (reminder.handled) return reminder;
   }
 

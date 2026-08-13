@@ -114,7 +114,7 @@ export default function ConnectionsPage() {
             ספק נוכחי: {tenant.integrations.paymentsProvider}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            {(["none", "grow", "payplus", "tranzila", "cardcom"] as const).map(
+            {(["none", "demo", "grow", "payplus", "tranzila", "cardcom"] as const).map(
               (p) => (
                 <button
                   key={p}

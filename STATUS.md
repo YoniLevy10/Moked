@@ -1,53 +1,47 @@
-# MOKED — תמונת מצב (מעודכן)
+# MOKED — תמונת מצב
 
-**דף נחיתה חי:** https://moked-ten.vercel.app  
-**PR מאוחד:** https://github.com/YoniLevy10/MOKED-/pull/3  
-**PRs שנסגרו אחרי איחוד:** #1 (תוכנית+אפליקציה), #2 (לוגו/landing ישן)
+## שני הקישורים (נכון)
 
----
-
-## איפה אנחנו עכשיו
-
-| שכבה | מה יש | איפה |
-|------|--------|------|
-| דף נחיתה חי | שער שם־עסק+תחום+דילוג → דמו מותאם | https://moked-ten.vercel.app |
-| דף נחיתה בקוד | פורט של חוויית השער + לוגו חדש | `apps/landing` |
-| מערכת מוצר | Next.js + 7 גלים + onboarding/dashboard/inbox | `src/` (מ־PR #1) |
-| תוכנית פסגה | החלטות נעולות | `docs/MOKED-SUMMIT-PLAN.md` |
-| מותג | Apple icon + wordmark/mark | `public/brand/`, `public/apple-touch-icon.png` |
+| מה | כתובת | תפקיד |
+|----|--------|--------|
+| **דף נחיתה / מכירה** | https://moked-ten.vercel.app · בקוד: `apps/landing` (:3001) | שער דמו ללקוחות פוטנציאליים |
+| **מערכת מלאה / Dashboard** | פריסת Vercel של האפליקציה · בקוד: `src/` (:3000) | onboarding, inbox, תהליכים, סימולטור |
+| **Superadmin** | `/superadmin` (אחרי כניסת מייל) | יצירת לקוחות מהירה בשבילך |
+| **כניסה** | `/login` | מייל+סיסמה (Supabase כשמוגדר / מקומי בפיתוח) |
 
 ---
 
-## החלטות שנעלו (לא לפתוח מחדש בלי פסגה)
+## איפה אנחנו בפיתוח
 
-1. **שוק:** ישראל בלבד (עצמאים / עסקים קטנים)
-2. **WhatsApp:** Meta **Cloud API ישיר** + Embedded Signup — **בלי BSP**, בלי Baileys/web.js
-3. **סדר גלים:**  
-   A Intake→Qualification→Booking → B Reminders→Retention → C Quote → **D Payment אחרון**
-4. **עקרון מוצר:** אוטומטי בשגרה · אנושי בהחלטות · לא צ׳אטבוט כללי
-5. **פיילוט:** מנוי ₪690 · WhatsApp `972548102688`
-6. **צבע מותג:** `#087A55`
-
----
-
-## מה נסגר / מה לא לגעת
-
-- לא לפתוח עוד PR מקביל לאותו ריפו בלי תיאום
-- לא לבנות דף נחיתה חלופי לדף החי
-- לא להקדים גבייה (גל D) לפני שיש Aha בגל A
+| גל | תהליכים | סטטוס |
+|----|----------|--------|
+| A | Intake → Qualification → Booking+כתובת | ✅ |
+| B | Reminders (אישור/דחייה/ביטול) + Retention | ✅ מחוזק |
+| C | Quote (+ בקשת הנחה אנושית) | ✅ מחוזק |
+| D | Payment (ספק `demo` בדמו) | ✅ מחוזק לסימולציה |
 
 ---
 
-## הצעד הבא בפיתוח
+## החלטות נעולות
 
-1. לחבר את `apps/landing` לפריסה (או להחליף את הפרויקט ב־Vercel למונורפו)
-2. Meta live: `META_APP_ID` / Embedded Signup / webhook
-3. להקשיח גל A בסימולציה ואז בחי
-4. DB קבוע (Postgres) במקום `.data/`
+1. ישראל בלבד  
+2. Meta Cloud API ישיר (בלי BSP)  
+3. Payment אחרון  
+4. אוטומטי בשגרה · אנושי בהחלטות  
+5. Superadmin לפי `ADMIN_EMAILS` (כמו Fixly)
 
-## הרצה מקומית
+---
+
+## הרצה
 
 ```bash
-npm install && npm run dev                 # מערכת :3000
-cd apps/landing && npm install && npm run dev  # נחיתה :3001
+# מערכת
+npm i && npm run dev                 # :3000
+
+# נחיתה
+cd apps/landing && npm i && npm run dev   # :3001
+
+# Superadmin מקומי
+# ב-.env.local: ADMIN_EMAILS=you@mail.com + ADMIN_BOOTSTRAP_PASSWORD=...
+# ואז /login עם אותו מייל
 ```

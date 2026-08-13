@@ -3,8 +3,11 @@
 import Image from "next/image";
 import { useMemo, useState } from "react";
 
-const PILOT_WA = "972548102688";
+const PILOT_WA =
+  process.env.NEXT_PUBLIC_PILOT_WHATSAPP || "972548102688";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 const WA_LINK = `https://wa.me/${PILOT_WA}?text=${encodeURIComponent("שלום, אשמח לפיילוט מוקד")}`;
+const ONBOARDING_LINK = `${APP_URL}/onboarding`;
 
 const FIELDS = [
   "אחזקה ושיפוצים",
@@ -147,7 +150,10 @@ export default function LandingPage() {
         </section>
 
         <div className="actions">
-          <a className="cta" href={WA_LINK} target="_blank" rel="noreferrer">
+          <a className="cta" href={ONBOARDING_LINK}>
+            חברו את העסק למערכת
+          </a>
+          <a className="cta secondary" href={WA_LINK} target="_blank" rel="noreferrer">
             דברו איתנו ב־WhatsApp
           </a>
           <button type="button" className="skip" onClick={() => setVisitor(null)}>
