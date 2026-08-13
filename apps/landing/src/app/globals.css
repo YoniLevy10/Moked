@@ -1,0 +1,221 @@
+@import "tailwindcss";
+
+:root {
+  --moked: #087a55;
+  --moked-deep: #065f42;
+  --ink: #1d1d1f;
+  --muted: #5c6660;
+  --paper: #f4f7f5;
+  --card: #ffffff;
+  --line: rgba(0, 0, 0, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  color: var(--ink);
+  font-family: var(--font-heebo), system-ui, sans-serif;
+  background:
+    radial-gradient(900px 500px at 100% -10%, rgba(8, 122, 85, 0.14), transparent 60%),
+    radial-gradient(700px 420px at 0% 0%, rgba(8, 122, 85, 0.08), transparent 55%),
+    var(--paper);
+}
+
+.gate-shell {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+}
+
+.gate-card {
+  width: min(440px, 100%);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  padding: 1.5rem;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.08);
+  animation: rise 0.55s ease both;
+}
+
+.gate-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.gate-brand .wordmark {
+  height: 28px;
+  width: auto;
+}
+
+.gate-card h1,
+.hero h1 {
+  margin: 0;
+  font-size: clamp(1.7rem, 4vw, 2.4rem);
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+
+.lede {
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0.7rem 0 1.2rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.4rem;
+  margin-bottom: 0.95rem;
+}
+
+.field span {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.field input {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0.85rem 0.95rem;
+  background: #fff;
+  font: inherit;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.chip {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 999px;
+  padding: 0.45rem 0.8rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.chip.on {
+  border-color: var(--moked);
+  background: rgba(8, 122, 85, 0.1);
+  color: var(--moked-deep);
+  font-weight: 700;
+}
+
+.cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  border: none;
+  border-radius: 999px;
+  padding: 0.9rem 1.1rem;
+  background: var(--moked);
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.cta:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cta.small {
+  width: auto;
+  padding: 0.65rem 1rem;
+}
+
+.cta:hover:not(:disabled) {
+  background: var(--moked-deep);
+}
+
+.skip {
+  display: block;
+  width: 100%;
+  margin-top: 0.7rem;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.demo-shell {
+  min-height: 100svh;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: min(960px, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 1rem 0;
+}
+
+.hero {
+  width: min(720px, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 1rem 0 3rem;
+}
+
+.eyebrow {
+  color: var(--moked-deep);
+  font-weight: 800;
+  margin: 0 0 0.6rem;
+}
+
+.chat {
+  display: grid;
+  gap: 0.55rem;
+  margin: 1.4rem 0;
+}
+
+.bubble {
+  max-width: 92%;
+  padding: 0.8rem 0.95rem;
+  border-radius: 16px;
+  line-height: 1.45;
+}
+
+.bubble.sys {
+  background: rgba(8, 122, 85, 0.1);
+  justify-self: start;
+}
+
+.bubble.user {
+  background: #1d1d1f;
+  color: #fff;
+  justify-self: end;
+}
+
+.actions {
+  display: grid;
+  gap: 0.4rem;
+  max-width: 320px;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
