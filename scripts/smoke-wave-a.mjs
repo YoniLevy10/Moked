@@ -2,16 +2,35 @@
 /**
  * Smoke: Wave A end-to-end against a running dev server.
  * Usage: node scripts/smoke-wave-a.mjs
- * Requires: npm run dev + tenant with demo WhatsApp connected
- *           (or pass AUTO_SETUP=1 to create via API)
+ * Requires: npm run dev
+ *           AUTO_SETUP=1 creates owner session + tenant + demo WA
  */
 const BASE = process.env.MOKED_BASE_URL || "http://localhost:3000";
 
-async function json(path, init) {
+const jar = { cookie: "" };
+
+function storeCookies(res) {
+  const raw = res.headers.getSetCookie?.() || [];
+  if (!raw.length) {
+    const single = res.headers.get("set-cookie");
+    if (single) raw.push(single);
+  }
+  for (const c of raw) {
+    const part = c.split(";")[0];
+    if (part.startsWith("moked_session=")) jar.cookie = part;
+  }
+}
+
+async function json(path, init = {}) {
   const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
     ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(jar.cookie ? { Cookie: jar.cookie } : {}),
+      ...(init.headers || {}),
+    },
   });
+  storeCookies(res);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = new Error(data.error || res.statusText || "request_failed");
@@ -22,7 +41,39 @@ async function json(path, init) {
   return data;
 }
 
+async function ensureSession() {
+  const me = await json("/api/auth");
+  if (me.user) return me.user;
+
+  if (process.env.AUTO_SETUP !== "1") {
+    throw new Error("Not logged in. Re-run with AUTO_SETUP=1");
+  }
+
+  const email = `smoke_${Date.now()}@moked.local`;
+  const password = "smoke1234";
+  try {
+    await json("/api/auth", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "register",
+        email,
+        password,
+        name: "Smoke Owner",
+      }),
+    });
+  } catch {
+    await json("/api/auth", {
+      method: "POST",
+      body: JSON.stringify({ action: "login", email, password }),
+    });
+  }
+  const again = await json("/api/auth");
+  if (!again.user) throw new Error("auth_failed");
+  return again.user;
+}
+
 async function ensureTenant() {
+  await ensureSession();
   const tenants = await json("/api/tenants");
   if (tenants.active?.whatsapp?.connected) return tenants.active;
 
@@ -32,15 +83,17 @@ async function ensureTenant() {
     );
   }
 
-  await json("/api/tenants", {
-    method: "POST",
-    body: JSON.stringify({
-      businessName: "אינסטלציה כהן",
-      ownerName: "יוסי",
-      phone: "0500000000",
-      vertical: "trades",
-    }),
-  });
+  if (!tenants.active) {
+    await json("/api/tenants", {
+      method: "POST",
+      body: JSON.stringify({
+        businessName: "אינסטלציה כהן",
+        ownerName: "יוסי",
+        phone: "0500000000",
+        vertical: "trades",
+      }),
+    });
+  }
   await json("/api/whatsapp/connect", {
     method: "POST",
     body: JSON.stringify({ mode: "demo" }),

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireSuperadmin } from "@/lib/auth/session";
 import {
   connectWhatsAppDemo,
   createTenant,
@@ -8,14 +7,19 @@ import {
   setProcessEnabled,
 } from "@/lib/store/db";
 import { ProcessKey } from "@/lib/types";
-import { registerOwner, linkUserToTenant } from "@/lib/auth/local-store";
+import {
+  getUserByEmail,
+  linkUserToTenant,
+  registerOwner,
+} from "@/lib/auth/local-store";
+import {
+  requireSuperadminContext,
+  switchActiveTenant,
+} from "@/lib/auth/tenant-context";
 
 export async function GET() {
-  try {
-    await requireSuperadmin();
-  } catch {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  }
+  const ctx = await requireSuperadminContext();
+  if (!ctx.ok) return ctx.response;
   const db = await getDb();
   return NextResponse.json({
     tenants: db.tenants,
@@ -43,11 +47,8 @@ const CreateSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  try {
-    await requireSuperadmin();
-  } catch {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  }
+  const ctx = await requireSuperadminContext();
+  if (!ctx.ok) return ctx.response;
 
   const body = CreateSchema.parse(await req.json());
   let tenant = await createTenant({
@@ -71,22 +72,50 @@ export async function POST(req: NextRequest) {
   }
 
   let owner = null;
-  if (body.ownerEmail && body.ownerPassword) {
-    try {
-      owner = await registerOwner({
-        email: body.ownerEmail,
-        password: body.ownerPassword,
-        name: body.ownerName,
-        tenantId: tenant.id,
-      });
-    } catch {
-      // If email exists, still link if we can find — skip for MVP
-      owner = null;
-    }
-    if (owner) {
-      await linkUserToTenant(owner.id, tenant.id);
+  let ownerNote: string | null = null;
+  if (body.ownerEmail) {
+    const existing = await getUserByEmail(body.ownerEmail);
+    if (existing) {
+      owner = await linkUserToTenant(existing.id, tenant.id);
+      ownerNote = "linked_existing_user";
+    } else if (body.ownerPassword) {
+      try {
+        owner = await registerOwner({
+          email: body.ownerEmail,
+          password: body.ownerPassword,
+          name: body.ownerName,
+          tenantId: tenant.id,
+        });
+        await linkUserToTenant(owner.id, tenant.id);
+        ownerNote = "created_owner";
+      } catch (e) {
+        ownerNote = e instanceof Error ? e.message : "owner_create_failed";
+      }
+    } else {
+      ownerNote = "owner_password_required_for_new_user";
     }
   }
 
-  return NextResponse.json({ tenant, owner }, { status: 201 });
+  return NextResponse.json(
+    { tenant, owner, ownerNote },
+    { status: 201 },
+  );
+}
+
+const PatchSchema = z.object({
+  action: z.literal("activate"),
+  tenantId: z.string().min(1),
+});
+
+/** Switch which tenant the superadmin dashboard operates on. */
+export async function PATCH(req: NextRequest) {
+  const ctx = await requireSuperadminContext();
+  if (!ctx.ok) return ctx.response;
+  const body = PatchSchema.parse(await req.json());
+  try {
+    const tenant = await switchActiveTenant(body.tenantId);
+    return NextResponse.json({ tenant, activeTenantId: tenant.id });
+  } catch {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
 }

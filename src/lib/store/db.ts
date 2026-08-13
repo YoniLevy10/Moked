@@ -62,10 +62,24 @@ export async function getDb(): Promise<DbShape> {
   return ensureDb();
 }
 
+export async function getTenantById(id: string): Promise<Tenant | null> {
+  const db = await ensureDb();
+  return db.tenants.find((t) => t.id === id) ?? null;
+}
+
 export async function getActiveTenant(): Promise<Tenant | null> {
   const db = await ensureDb();
   if (!db.activeTenantId) return db.tenants[0] ?? null;
   return db.tenants.find((t) => t.id === db.activeTenantId) ?? null;
+}
+
+export async function setActiveTenantId(tenantId: string): Promise<Tenant> {
+  const db = await ensureDb();
+  const tenant = db.tenants.find((t) => t.id === tenantId);
+  if (!tenant) throw new Error("Tenant not found");
+  db.activeTenantId = tenantId;
+  await writeDb(db);
+  return tenant;
 }
 
 export async function createTenant(input: {
@@ -148,6 +162,28 @@ export async function connectWhatsAppDemo(tenantId: string): Promise<Tenant> {
       displayPhone: "+972500000000",
       phoneNumberId: `demo_${tenantId}`,
       wabaId: `demo_waba_${tenantId}`,
+      connectedAt: new Date().toISOString(),
+    },
+  });
+}
+
+export async function connectWhatsAppLive(
+  tenantId: string,
+  input: {
+    wabaId: string;
+    phoneNumberId: string;
+    displayPhone?: string;
+    accessToken: string;
+  },
+): Promise<Tenant> {
+  return updateTenant(tenantId, {
+    whatsapp: {
+      connected: true,
+      mode: "live",
+      wabaId: input.wabaId,
+      phoneNumberId: input.phoneNumberId,
+      displayPhone: input.displayPhone,
+      accessToken: input.accessToken,
       connectedAt: new Date().toISOString(),
     },
   });

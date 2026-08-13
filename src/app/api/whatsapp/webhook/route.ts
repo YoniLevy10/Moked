@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/store/db";
 import { handleInboundMessage } from "@/lib/processes/engine";
+import { verifyMetaSignature } from "@/lib/whatsapp/client";
 import { parseInboundMessages } from "@/lib/whatsapp/webhook";
 
 export async function GET(req: NextRequest) {
@@ -16,18 +17,31 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const payload = await req.json();
+  const rawBody = await req.text();
+  const signature = req.headers.get("x-hub-signature-256");
+  if (!verifyMetaSignature(rawBody, signature)) {
+    return NextResponse.json({ error: "invalid_signature" }, { status: 401 });
+  }
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(rawBody);
+  } catch {
+    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+  }
+
   const inbound = parseInboundMessages(payload);
   const db = await getDb();
   const results = [];
 
   for (const msg of inbound) {
-    const tenant =
-      db.tenants.find((t) => t.whatsapp.phoneNumberId === msg.phoneNumberId) ??
-      db.tenants.find((t) => t.id === db.activeTenantId) ??
-      db.tenants[0];
+    const tenant = db.tenants.find(
+      (t) =>
+        t.whatsapp.connected &&
+        t.whatsapp.phoneNumberId === msg.phoneNumberId,
+    );
 
-    if (!tenant?.whatsapp.connected) continue;
+    if (!tenant) continue;
 
     const handled = await handleInboundMessage({
       tenant,

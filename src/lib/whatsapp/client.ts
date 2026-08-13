@@ -1,12 +1,20 @@
+import { createHmac, timingSafeEqual } from "crypto";
 import { Tenant } from "@/lib/types";
 
 const GRAPH = "https://graph.facebook.com/v21.0";
+
+export function getWhatsAppToken(tenant: Tenant): string | null {
+  if (tenant.whatsapp.mode === "live" && tenant.whatsapp.accessToken) {
+    return tenant.whatsapp.accessToken;
+  }
+  return process.env.META_WHATSAPP_TOKEN ?? null;
+}
 
 export function isLiveWhatsApp(tenant: Tenant): boolean {
   return (
     tenant.whatsapp.connected &&
     tenant.whatsapp.mode === "live" &&
-    Boolean(process.env.META_WHATSAPP_TOKEN)
+    Boolean(getWhatsAppToken(tenant) && tenant.whatsapp.phoneNumberId)
   );
 }
 
@@ -21,12 +29,13 @@ export async function sendWhatsAppText(input: {
   }
 
   const phoneNumberId = input.tenant.whatsapp.phoneNumberId;
-  if (!phoneNumberId) throw new Error("Missing phoneNumberId");
+  const token = getWhatsAppToken(input.tenant);
+  if (!phoneNumberId || !token) throw new Error("Missing live WhatsApp credentials");
 
   const res = await fetch(`${GRAPH}/${phoneNumberId}/messages`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${process.env.META_WHATSAPP_TOKEN}`,
+      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -51,7 +60,29 @@ export function getEmbeddedSignupConfig() {
     configId: process.env.META_EMBEDDED_SIGNUP_CONFIG_ID ?? "",
     graphVersion: "v21.0",
     ready: Boolean(
-      process.env.META_APP_ID && process.env.META_EMBEDDED_SIGNUP_CONFIG_ID,
+      process.env.META_APP_ID &&
+        process.env.META_APP_SECRET &&
+        process.env.META_EMBEDDED_SIGNUP_CONFIG_ID,
     ),
   };
+}
+
+/** Verify Meta X-Hub-Signature-256 when META_APP_SECRET is set. */
+export function verifyMetaSignature(
+  rawBody: string,
+  signatureHeader: string | null,
+): boolean {
+  const secret = process.env.META_APP_SECRET;
+  if (!secret) return true; // soft-open in local/dev without secret
+  if (!signatureHeader?.startsWith("sha256=")) return false;
+  const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
+  const provided = signatureHeader.slice("sha256=".length);
+  try {
+    const a = Buffer.from(expected, "hex");
+    const b = Buffer.from(provided, "hex");
+    if (a.length !== b.length) return false;
+    return timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
 }

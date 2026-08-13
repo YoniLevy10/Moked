@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { EmbeddedSignupButton } from "@/components/whatsapp/EmbeddedSignupButton";
 
 const VERTICALS = [
   { id: "clinic", label: "קליניקה / טיפול" },
@@ -35,7 +36,14 @@ export default function OnboardingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      if (!res.ok) throw new Error("יצירת העסק נכשלה");
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.error === "already_has_tenant") {
+          setStep(2);
+          return;
+        }
+        throw new Error(data.message ?? data.error ?? "יצירת העסק נכשלה");
+      }
       setStep(2);
     } catch (err) {
       setError(err instanceof Error ? err.message : "שגיאה");
@@ -44,14 +52,14 @@ export default function OnboardingPage() {
     }
   }
 
-  async function connectWhatsApp(mode: "demo" | "live") {
+  async function connectWhatsAppDemo() {
     setLoading(true);
     setError(null);
     try {
       const res = await fetch("/api/whatsapp/connect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode }),
+        body: JSON.stringify({ mode: "demo" }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -144,25 +152,25 @@ export default function OnboardingPage() {
         <div className="animate-rise space-y-6">
           <h1 className="display text-3xl font-bold">חבר WhatsApp</h1>
           <p className="text-muted leading-relaxed">
-            במצב ייצור: Embedded Signup ישיר ל-Meta Cloud API.
+            מומלץ: חיבור חי ל-Meta Cloud API (Embedded Signup).
             <br />
-            כרגע אפשר להתחיל בדמו מלא — כל 7 הגלים פעילים במערכת.
+            לדמו מקומי בלי Meta — השתמשו בכפתור הדמו.
           </p>
 
-          <button
+          <EmbeddedSignupButton
             disabled={loading}
-            onClick={() => connectWhatsApp("demo")}
-            className="w-full rounded-full bg-ink py-3.5 font-semibold text-white hover:bg-brand-deep disabled:opacity-60"
-          >
-            {loading ? "מחבר..." : "חבר WhatsApp (דמו — לחיצה אחת)"}
-          </button>
+            onConnected={() => router.push("/dashboard")}
+            onError={setError}
+            className="w-full rounded-full bg-brand py-3.5 font-semibold text-white hover:bg-brand-deep disabled:opacity-60"
+            label="חבר WhatsApp חי דרך Meta"
+          />
 
           <button
             disabled={loading}
-            onClick={() => connectWhatsApp("live")}
+            onClick={() => void connectWhatsAppDemo()}
             className="w-full rounded-full border border-line bg-white/70 py-3.5 font-semibold hover:bg-white disabled:opacity-60"
           >
-            חיבור חי ל-Meta (דורש .env)
+            {loading ? "מחבר..." : "חבר במצב דמו (בלי Meta)"}
           </button>
 
           {error && <p className="text-sm text-danger">{error}</p>}

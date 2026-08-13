@@ -113,6 +113,8 @@ export const TenantSchema = z.object({
       wabaId: z.string().optional(),
       phoneNumberId: z.string().optional(),
       displayPhone: z.string().optional(),
+      /** Per-tenant Meta business token (live mode). Prefer over global env token. */
+      accessToken: z.string().optional(),
       connectedAt: z.string().optional(),
       mode: z.enum(["demo", "live"]).default("demo"),
     })

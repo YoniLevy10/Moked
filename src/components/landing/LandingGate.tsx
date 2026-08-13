@@ -154,7 +154,7 @@ export function LandingGate() {
         </section>
 
         <div className="actions">
-          <Link className="cta" href="/onboarding">
+          <Link className="cta" href="/login?next=/onboarding">
             חברו את העסק למערכת
           </Link>
           <a
@@ -165,11 +165,11 @@ export function LandingGate() {
           >
             דברו איתנו ב־WhatsApp
           </a>
-          <Link className="cta secondary" href="/dashboard">
-            ללוח הבקרה
+          <Link className="cta secondary" href="/login?next=/dashboard">
+            כניסת בעל עסק לדשבורד
           </Link>
-          <Link className="cta secondary" href="/login">
-            כניסה למערכת
+          <Link className="cta secondary" href="/login?next=/superadmin">
+            כניסת Superadmin
           </Link>
           <button type="button" className="skip" onClick={() => setVisitor(null)}>
             חזרה לשער
