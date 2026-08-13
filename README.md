@@ -6,12 +6,11 @@
 
 | | כתובת |
 |--|--------|
-| נחיתה (`/`) | https://temporary-express-spruce-8f7jo8m.vercel.app |
-| Dashboard | …/dashboard |
+| נחיתה (`/`) | https://moked-ten.vercel.app |
+| Dashboard | https://moked-ten.vercel.app/dashboard |
 | Login / Superadmin | …/login · …/superadmin |
-| דומיין היסטורי | `moked-ten.vercel.app` — כרגע 404 עד חיבור Vercel מחדש |
 
-פריסה אחת: שער הנחיתה ב־`/` והמערכת ב־`/dashboard`. שמירה לצמיתות: claim ב־Vercel + חיבור הפרויקט ל־GitHub.
+פריסה אחת: שער הנחיתה ב־`/` והמערכת ב־`/dashboard`.
 
 מסמכים: [`STATUS.md`](./STATUS.md) · [`docs/MOKED-SUMMIT-PLAN.md`](./docs/MOKED-SUMMIT-PLAN.md)
 
