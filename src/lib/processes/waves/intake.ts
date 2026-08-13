@@ -1,13 +1,37 @@
 import { ProcessContext, ProcessResult } from "@/lib/processes/types";
 import { greetingFor } from "@/lib/store/db";
 
-const SUPPORT_HINTS = ["תמיכה", "בעיה", "תלונה", "לא עובד", "עזרה"];
-const SPAM_HINTS = ["השקעה מובטחת", "crypto", "פורקס", "הלוואה מהירה"];
+const SUPPORT_HINTS = [
+  "תמיכה",
+  "בעיה במערכת",
+  "תלונה",
+  "לא עובד האפליקציה",
+  "עזרה טכנית",
+];
+const SPAM_HINTS = ["השקעה מובטחת", "crypto", "פורקס", "הלוואה מהירה", "היכרויות"];
+const SALES_HINTS = [
+  "נזילה",
+  "אינסטלציה",
+  "חשמל",
+  "מזגן",
+  "תיקון",
+  "קצר",
+  "סתימה",
+  "תור",
+  "לקבוע",
+  "מחיר",
+  "הצעה",
+  "ביקור",
+  "טכנאי",
+  "ניקיון",
+  "טיפול",
+];
 
 function detectIntent(text: string): "sales" | "support" | "spam" | "unknown" {
   const t = text.toLowerCase();
-  if (SPAM_HINTS.some((h) => t.includes(h))) return "spam";
-  if (SUPPORT_HINTS.some((h) => t.includes(h))) return "support";
+  if (SPAM_HINTS.some((h) => t.includes(h.toLowerCase()))) return "spam";
+  if (SUPPORT_HINTS.some((h) => t.includes(h.toLowerCase()))) return "support";
+  if (SALES_HINTS.some((h) => t.includes(h.toLowerCase()))) return "sales";
   if (text.trim().length > 0) return "sales";
   return "unknown";
 }
@@ -18,6 +42,7 @@ export function handleIntake(ctx: ProcessContext): ProcessResult {
   const qualificationEnabled = Boolean(
     ctx.tenant.processes.qualification?.enabled,
   );
+  const issue = ctx.inboundText.trim();
 
   if (intent === "spam") {
     return {
@@ -37,7 +62,7 @@ export function handleIntake(ctx: ProcessContext): ProcessResult {
       handled: true,
       replies: [
         {
-          body: `${greeting}\n\nראיתי שמדובר בנושא תמיכה — מעביר/ה אותך בהקדם לטיפול אישי.`,
+          body: `${greeting}\n\nראיתי שמדובר בנושא תמיכה — מעביר/ה אותך בהקדם לטיפול אישי של בעל העסק.`,
           processKey: "intake",
         },
       ],
@@ -47,22 +72,24 @@ export function handleIntake(ctx: ProcessContext): ProcessResult {
         processState: {
           ...ctx.conversation.processState,
           intakeDone: true,
+          issue,
+          needsHuman: true,
         },
       },
-      events: ["lead.created", "intake.completed"],
+      events: ["lead.created", "intake.completed", "intake.support_escalated"],
     };
   }
 
   const replies: ProcessResult["replies"] = [
     {
-      body: `${greeting}\n\nכדי להתאים לך מענה מדויק, אשאל כמה שאלות קצרות.`,
+      body: `${greeting}\n\nקיבלתי: «${issue.slice(0, 120)}».\nכדי להתאים מענה מדויק, אשאל כמה שאלות קצרות.`,
       processKey: "intake",
     },
   ];
 
   if (qualificationEnabled) {
     replies.push({
-      body: "איזה שירות מעניין אותך?",
+      body: "מתי נוח שנתאם ביקור? (היום / מחר / השבוע / גמיש)",
       processKey: "qualification",
     });
   }
@@ -76,6 +103,7 @@ export function handleIntake(ctx: ProcessContext): ProcessResult {
       processState: {
         ...ctx.conversation.processState,
         intakeDone: true,
+        issue,
         qualificationAsked: qualificationEnabled,
         qualificationStep: 0,
         qualificationAnswers: [],

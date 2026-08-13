@@ -10,11 +10,20 @@ type Status = {
   displayPhone?: string;
 };
 
+type SimStep = {
+  inbound: string;
+  replies: string[];
+  activeProcess?: string;
+  events?: string[];
+  leadScore?: number;
+};
+
 export default function DashboardHome() {
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
-  const [simText, setSimText] = useState("היי, אשמח לקבוע תור");
-  const [simResult, setSimResult] = useState<string | null>(null);
+  const [simText, setSimText] = useState("יש נזילה במטבח. אפשר להגיע היום?");
+  const [simLog, setSimLog] = useState<string[]>([]);
+  const [waveSteps, setWaveSteps] = useState<SimStep[]>([]);
   const [loading, setLoading] = useState(false);
 
   async function refresh() {
@@ -34,7 +43,6 @@ export default function DashboardHome() {
 
   async function simulate() {
     setLoading(true);
-    setSimResult(null);
     try {
       const res = await fetch("/api/demo/simulate-inbound", {
         method: "POST",
@@ -43,11 +51,48 @@ export default function DashboardHome() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "שגיאה");
-      setSimResult(
-        `תהליך: ${data.activeProcess ?? "—"} · כוונה: ${data.intent} · תשובות: ${data.replies?.length ?? 0}`,
-      );
+      const replies = (data.replies ?? [])
+        .map((r: { body: string }) => r.body)
+        .join("\n---\n");
+      setSimLog((prev) => [
+        `את/ה: ${simText}`,
+        `מוקד (${data.activeProcess ?? "—"} · score ${data.leadScore ?? "—"}):\n${replies || "(ללא תשובה)"}`,
+        ...prev,
+      ]);
+      setSimText("");
     } catch (e) {
-      setSimResult(e instanceof Error ? e.message : "שגיאה");
+      setSimLog((prev) => [
+        e instanceof Error ? e.message : "שגיאה",
+        ...prev,
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function runWaveA() {
+    setLoading(true);
+    setWaveSteps([]);
+    try {
+      const res = await fetch("/api/demo/wave-a", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ script: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "שגיאה");
+      setWaveSteps(data.steps ?? []);
+      setSimLog((prev) => [
+        data.waveADone
+          ? `✓ גל A הושלם · כתובת: ${data.address} · הודעות: ${data.messageCount}`
+          : `גל A לא הושלם במלואו`,
+        ...prev,
+      ]);
+    } catch (e) {
+      setSimLog((prev) => [
+        e instanceof Error ? e.message : "שגיאה",
+        ...prev,
+      ]);
     } finally {
       setLoading(false);
     }
@@ -122,23 +167,59 @@ export default function DashboardHome() {
       <section className="rounded-3xl border border-line bg-white/70 p-6">
         <h2 className="display text-xl font-bold">סימולטור לקוח (דמו)</h2>
         <p className="mt-2 text-sm text-muted">
-          שולח הודעה נכנסת ומריץ את מנוע התהליכים על כל הגלים הפעילים.
+          שולח הודעה נכנסת ומריץ את מנוע התהליכים. גל A: קליטה → סינון → תור+כתובת.
         </p>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row">
           <input
             className="flex-1 rounded-2xl border border-line bg-white px-4 py-3 outline-none ring-brand focus:ring-2"
             value={simText}
             onChange={(e) => setSimText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void simulate();
+            }}
+            placeholder="הודעת לקוח…"
           />
           <button
-            onClick={simulate}
-            disabled={loading || !status?.connected}
+            onClick={() => void simulate()}
+            disabled={loading || !status?.connected || !simText.trim()}
             className="rounded-full bg-brand px-6 py-3 font-semibold text-white hover:bg-brand-deep disabled:opacity-50"
           >
             {loading ? "שולח..." : "שלח הודעה"}
           </button>
+          <button
+            onClick={() => void runWaveA()}
+            disabled={loading || !status?.connected}
+            className="rounded-full border border-brand bg-white px-6 py-3 font-semibold text-brand hover:bg-brand/5 disabled:opacity-50"
+          >
+            הרץ גל A מלא
+          </button>
         </div>
-        {simResult && <p className="mt-3 text-sm text-ink">{simResult}</p>}
+
+        {waveSteps.length > 0 && (
+          <div className="mt-5 space-y-3 rounded-2xl bg-paper/80 p-4">
+            <div className="text-sm font-bold text-brand">תסריט גל A</div>
+            {waveSteps.map((step, i) => (
+              <div key={`${step.inbound}-${i}`} className="text-sm">
+                <div className="font-semibold">לקוח: {step.inbound}</div>
+                {step.replies.map((r) => (
+                  <div
+                    key={r}
+                    className="mt-1 whitespace-pre-wrap text-muted"
+                  >
+                    מוקד: {r}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {simLog.length > 0 && (
+          <pre className="mt-4 max-h-64 overflow-auto whitespace-pre-wrap rounded-2xl bg-ink px-4 py-3 text-sm text-white/90">
+            {simLog.join("\n\n")}
+          </pre>
+        )}
+
         <div className="mt-4 flex flex-wrap gap-3 text-sm">
           <Link href="/dashboard/inbox" className="text-brand underline">
             לתיבת השיחות

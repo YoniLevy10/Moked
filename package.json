@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "eslint",
     "dev:landing": "npm --prefix apps/landing run dev",
-    "build:landing": "npm --prefix apps/landing run build"
+    "build:landing": "npm --prefix apps/landing run build",
+    "smoke:wave-a": "node scripts/smoke-wave-a.mjs"
   },
   "dependencies": {
     "nanoid": "^6.0.1",

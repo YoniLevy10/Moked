@@ -44,3 +44,10 @@ cd apps/landing && npm install && npm run dev
 ## Meta Live
 
 העתיקו `.env.example` ל־`.env.local` (ראו משתני `META_*`).
+
+## בדיקת גל A
+
+```bash
+# אחרי npm run dev + חיבור דמו, או:
+AUTO_SETUP=1 npm run smoke:wave-a
+```
