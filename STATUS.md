@@ -1,19 +1,17 @@
 # MOKED — תמונת מצב
 
-## קישורים חיים (עכשיו)
-
-> `moked-ten.vercel.app` מחזיר **404** — אין פריסת production מחוברת לחשבון Vercel.
-> פורסמה פריסה זמנית (תוקף ~שעה) עד שתתחבר מחדש / תמסור `VERCEL_TOKEN`.
+## קישורים חיים
 
 | מה | כתובת |
 |----|--------|
-| **נחיתה + מערכת (אותו דומיין)** | https://temporary-express-spruce-8f7jo8m.vercel.app |
-| Dashboard | https://temporary-express-spruce-8f7jo8m.vercel.app/dashboard |
-| Login | https://temporary-express-spruce-8f7jo8m.vercel.app/login |
-| Superadmin | https://temporary-express-spruce-8f7jo8m.vercel.app/superadmin |
-| **לשמור לצמיתות** | [Claim deployment](https://vercel.com/claim-deployment?code=6fffe406-815e-43c2-b678-4590b1037ac6) → ואז לחבר דומיין `moked-ten.vercel.app` |
+| **נחיתה + מערכת** | https://moked-ten.vercel.app |
+| Dashboard | https://moked-ten.vercel.app/dashboard |
+| Login | https://moked-ten.vercel.app/login |
+| Superadmin | https://moked-ten.vercel.app/superadmin |
 
-במונורפו: `/` = שער נחיתה, `/dashboard` = מערכת מלאה (פריסה אחת).
+פריסה אחת: `/` = שער נחיתה, `/dashboard` = מערכת מלאה.
+
+> **הערה (תוקן 13.08):** הפרויקט היה עם `framework: null` ולכן deployment עלה Ready בלי output → 404. הוגדר `nextjs` ונפרס מחדש מ־`main`.
 
 ---
 
