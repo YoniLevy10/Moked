@@ -17,7 +17,7 @@ export default function DashboardLayout({
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-6 sm:px-6">
       <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <Link href="/" className="flex items-center gap-2">
-          <img src="/brand/moked-mark-green.png" alt="" width={28} height={28} />
+          <img src="/brand/moked-mark-black.png" alt="" width={28} height={28} />
           <img
             src="/brand/moked-logo-wordmark.png"
             alt="MOKED"
