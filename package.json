@@ -1,0 +1,22 @@
+{
+  "name": "moked",
+  "version": "0.1.0",
+  "private": true,
+  "description": "מוקד — שכבת תפעול לעסקים בוואטסאפ",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "dev:landing": "npm --prefix apps/landing run dev",
+    "build:landing": "npm --prefix apps/landing run build"
+  },
+  "dependencies": {
+    "next": "^15.5.2",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,12 @@
+node_modules
+.next
+out
+dist
+.env
+.env.local
+.env*.local
+.DS_Store
+*.log
+apps/landing/node_modules
+apps/landing/.next
+.vercel
