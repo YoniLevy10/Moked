@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+:root {
+  --moked-green: #3e7c59;
+  --moked-green-deep: #2f5f44;
+  --moked-green-soft: #e8f1ec;
+  --moked-ink: #212121;
+  --moked-muted: #5c6660;
+  --moked-paper: #f7faf8;
+  --moked-cream: #eef5f0;
+  --background: var(--moked-paper);
+  --foreground: var(--moked-ink);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-moked-green: var(--moked-green);
+  --color-moked-green-deep: var(--moked-green-deep);
+  --color-moked-green-soft: var(--moked-green-soft);
+  --color-moked-ink: var(--moked-ink);
+  --color-moked-muted: var(--moked-muted);
+  --color-moked-paper: var(--moked-paper);
+  --color-moked-cream: var(--moked-cream);
+  --font-sans: var(--font-heebo);
+  --font-display: var(--font-outfit);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-heebo), sans-serif;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--moked-green) 28%, white);
+  color: var(--moked-ink);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(2%, -1.5%, 0) scale(1.04);
+  }
+}
+
+@keyframes draw-line {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.animate-rise {
+  animation: rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-rise-delay {
+  animation: rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+}
+
+.animate-rise-delay-2 {
+  animation: rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both;
+}
+
+.animate-drift {
+  animation: drift 14s ease-in-out infinite;
+}
+
+.animate-draw {
+  transform-origin: right center;
+  animation: draw-line 1s cubic-bezier(0.22, 1, 0.36, 1) 0.45s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise,
+  .animate-rise-delay,
+  .animate-rise-delay-2,
+  .animate-drift,
+  .animate-draw {
+    animation: none;
+  }
+}

@@ -4,8 +4,8 @@ export const metadata = {
   title: "מוקד — מערכת תפעול",
   description: "שכבת תפעול לעסקים בוואטסאפ. אוטומטי בשגרה. אנושי בהחלטות.",
   icons: {
-    icon: "/moked-logo.svg",
-    apple: "/moked-mark.png",
+    icon: "/favicon.png",
+    apple: "/apple-touch-icon.png",
   },
 };
 
@@ -24,8 +24,13 @@ export default function RootLayout({ children }) {
         <div className="app-shell">
           <header className="topbar">
             <div className="brand">
-              <img src="/moked-logo.svg" alt="מוקד" />
-              <span>מוקד</span>
+              <img src="/brand/moked-mark-green.png" alt="מוקד" width={36} height={36} />
+              <img
+                src="/brand/moked-logo-wordmark.png"
+                alt="MOKED"
+                height={28}
+                style={{ height: 28, width: "auto" }}
+              />
             </div>
             <nav className="nav">
               <a href="/">סימולציה</a>
