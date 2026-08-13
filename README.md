@@ -24,7 +24,8 @@
 | WhatsApp Cloud API + webhook | ✅ `lib/whatsapp/client.js`, `/api/whatsapp/webhook` |
 | `lead` — פנייה שלא נענתה | ✅ חי בסימולציה |
 | `quote` — הצעה + אישור הנחה | ✅ חי בסימולציה |
-| `reminder` / `collect` / `dispatch` / `report` / `review` | 🟡 stubs |
+| `reminder` — תזכורת ביקור | ✅ חי בסימולציה |
+| `collect` / `dispatch` / `report` / `review` | 🟡 stubs |
 | Onboarding | ✅ `/onboarding` |
 | דשבורד סימולציה | ✅ `/` + `POST /api/admin` |
 | Approvals API | ✅ `/api/approvals` |
