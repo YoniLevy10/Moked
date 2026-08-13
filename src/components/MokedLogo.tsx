@@ -16,8 +16,8 @@ export function MokedLogo({
       <Image
         src="/brand/moked-mark-green.png"
         alt="MOKED"
-        width={512}
-        height={512}
+        width={890}
+        height={665}
         className={className}
         priority={priority}
       />
@@ -28,8 +28,8 @@ export function MokedLogo({
     <Image
       src="/brand/moked-logo-wordmark.png"
       alt="MOKED"
-      width={840}
-      height={240}
+      width={1403}
+      height={313}
       className={className}
       priority={priority}
     />
