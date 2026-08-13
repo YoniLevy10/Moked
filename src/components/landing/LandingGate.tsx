@@ -1,15 +1,12 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 const PILOT_WA =
   process.env.NEXT_PUBLIC_PILOT_WHATSAPP || "972548102688";
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 const WA_LINK = `https://wa.me/${PILOT_WA}?text=${encodeURIComponent("שלום, אשמח לפיילוט מוקד")}`;
-const ONBOARDING_LINK = `${APP_URL}/onboarding`;
-const DASHBOARD_LINK = `${APP_URL}/dashboard`;
-const LOGIN_LINK = `${APP_URL}/login`;
 
 const FIELDS = [
   "אחזקה ושיפוצים",
@@ -21,7 +18,7 @@ const FIELDS = [
 
 type Visitor = { name: string; field: string; skip?: boolean };
 
-export default function LandingPage() {
+export function LandingGate() {
   const [visitor, setVisitor] = useState<Visitor | null>(null);
   const [name, setName] = useState("");
   const [field, setField] = useState<(typeof FIELDS)[number] | "">("");
@@ -110,7 +107,12 @@ export default function LandingPage() {
     <div className="demo-shell">
       <header className="nav">
         <div className="gate-brand">
-          <Image src="/brand/moked-mark-green.png" alt="" width={36} height={36} />
+          <Image
+            src="/brand/moked-mark-green.png"
+            alt=""
+            width={36}
+            height={36}
+          />
           <Image
             src="/brand/moked-logo-wordmark.png"
             alt="MOKED"
@@ -152,18 +154,23 @@ export default function LandingPage() {
         </section>
 
         <div className="actions">
-          <a className="cta" href={ONBOARDING_LINK}>
+          <Link className="cta" href="/onboarding">
             חברו את העסק למערכת
-          </a>
-          <a className="cta secondary" href={WA_LINK} target="_blank" rel="noreferrer">
+          </Link>
+          <a
+            className="cta secondary"
+            href={WA_LINK}
+            target="_blank"
+            rel="noreferrer"
+          >
             דברו איתנו ב־WhatsApp
           </a>
-          <a className="cta secondary" href={DASHBOARD_LINK}>
+          <Link className="cta secondary" href="/dashboard">
             ללוח הבקרה
-          </a>
-          <a className="cta secondary" href={LOGIN_LINK}>
+          </Link>
+          <Link className="cta secondary" href="/login">
             כניסה למערכת
-          </a>
+          </Link>
           <button type="button" className="skip" onClick={() => setVisitor(null)}>
             חזרה לשער
           </button>

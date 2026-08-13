@@ -1,13 +1,19 @@
 # MOKED — תמונת מצב
 
-## שני הקישורים (נכון)
+## קישורים חיים (עכשיו)
 
-| מה | כתובת | תפקיד |
-|----|--------|--------|
-| **דף נחיתה / מכירה** | https://moked-ten.vercel.app · בקוד: `apps/landing` (:3001) | שער דמו ללקוחות פוטנציאליים |
-| **מערכת מלאה / Dashboard** | פריסת Vercel של האפליקציה · בקוד: `src/` (:3000) | onboarding, inbox, תהליכים, סימולטור |
-| **Superadmin** | `/superadmin` (אחרי כניסת מייל) | יצירת לקוחות מהירה בשבילך |
-| **כניסה** | `/login` | מייל+סיסמה (Supabase כשמוגדר / מקומי בפיתוח) |
+> `moked-ten.vercel.app` מחזיר **404** — אין פריסת production מחוברת לחשבון Vercel.
+> פורסמה פריסה זמנית (תוקף ~שעה) עד שתתחבר מחדש / תמסור `VERCEL_TOKEN`.
+
+| מה | כתובת |
+|----|--------|
+| **נחיתה + מערכת (אותו דומיין)** | https://temporary-express-spruce-8f7jo8m.vercel.app |
+| Dashboard | https://temporary-express-spruce-8f7jo8m.vercel.app/dashboard |
+| Login | https://temporary-express-spruce-8f7jo8m.vercel.app/login |
+| Superadmin | https://temporary-express-spruce-8f7jo8m.vercel.app/superadmin |
+| **לשמור לצמיתות** | [Claim deployment](https://vercel.com/claim-deployment?code=6fffe406-815e-43c2-b678-4590b1037ac6) → ואז לחבר דומיין `moked-ten.vercel.app` |
+
+במונורפו: `/` = שער נחיתה, `/dashboard` = מערכת מלאה (פריסה אחת).
 
 ---
 
@@ -16,9 +22,9 @@
 | גל | תהליכים | סטטוס |
 |----|----------|--------|
 | A | Intake → Qualification → Booking+כתובת | ✅ |
-| B | Reminders (אישור/דחייה/ביטול) + Retention | ✅ מחוזק |
-| C | Quote (+ בקשת הנחה אנושית) | ✅ מחוזק |
-| D | Payment (ספק `demo` בדמו) | ✅ מחוזק לסימולציה |
+| B | Reminders + Retention | ✅ |
+| C | Quote (+ הנחה אנושית) | ✅ |
+| D | Payment (`demo`) | ✅ סימולציה |
 
 ---
 
@@ -32,16 +38,9 @@
 
 ---
 
-## הרצה
+## הרצה מקומית
 
 ```bash
-# מערכת
-npm i && npm run dev                 # :3000
-
-# נחיתה
-cd apps/landing && npm i && npm run dev   # :3001
-
-# Superadmin מקומי
-# ב-.env.local: ADMIN_EMAILS=you@mail.com + ADMIN_BOOTSTRAP_PASSWORD=...
-# ואז /login עם אותו מייל
+npm i && npm run dev                 # :3000 — נחיתה + מערכת
+# אופציונלי: apps/landing על :3001 (אותו שער)
 ```
