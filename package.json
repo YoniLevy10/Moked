@@ -2,21 +2,30 @@
   "name": "moked",
   "version": "0.1.0",
   "private": true,
-  "description": "מוקד — שכבת תפעול לעסקים בוואטסאפ",
+  "description": "MOKED — WhatsApp process OS for Israeli independents",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint",
     "dev:landing": "npm --prefix apps/landing run dev",
     "build:landing": "npm --prefix apps/landing run build"
   },
   "dependencies": {
-    "next": "^15.5.2",
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "nanoid": "^6.0.1",
+    "next": "16.3.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zod": "^4.4.3"
   },
-  "engines": {
-    "node": ">=20"
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.0",
+    "tailwindcss": "^4",
+    "typescript": "5.8.2"
   }
 }

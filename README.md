@@ -1,50 +1,46 @@
-# מוקד (MOKED)
+# MOKED
 
-שכבת תפעול לעסקים קטנים **בוואטסאפ** — לא צ׳אטבוט כללי.
+מוקד תפעולי לעצמאים בישראל — חיבור WhatsApp Cloud API בלחיצה, וסגירת 7 תהליכים לפי גלים.
 
-**אוטומטי בשגרה. אנושי בהחלטות.** · שוק: ישראל · מנוי פיילוט: **₪690**
+**דף נחיתה חי:** https://moked-ten.vercel.app  
+**סטטוס מלא + החלטות:** [`STATUS.md`](./STATUS.md) · **תוכנית פסגה:** [`docs/MOKED-SUMMIT-PLAN.md`](./docs/MOKED-SUMMIT-PLAN.md)
 
-> תמונת מצב סוכנים + מה לא לדרוס: [`STATUS.md`](./STATUS.md)  
-> תוכנית פסגה (החלטות נעולות): [`docs/MOKED-SUMMIT-PLAN.md`](./docs/MOKED-SUMMIT-PLAN.md)
+## מבנה
 
-## מבנה (monorepo)
-
-| נתיב | תוכן | מקור |
-|------|------|------|
-| `apps/landing/` | דף נחיתה מעוצב | PR #2 (לוגו + landing) |
-| `app/` + `lib/` | מערכת Next.js — מנוע, workflows, סימולציה, webhook | PR #3 |
-| `docs/` | תוכנית פסגה CEO/CTO/COO | PR #1 |
-| `public/brand/` | mark ירוק + wordmark + apple icon | PR #2 |
+| נתיב | תוכן |
+|------|------|
+| `src/` | אפליקציית המוצר (onboarding, dashboard, 7 גלים, WhatsApp APIs) |
+| `apps/landing/` | דף נחיתה (שער דמו) |
+| `public/brand/` | לוגו mark + wordmark |
+| `docs/` | תוכנית פסגה |
 
 ## הרצה
 
 ```bash
-# מערכת (סימולציה) — :3000
 npm install && npm run dev
+```
 
-# דף נחיתה — :3001
+1. `/onboarding` — יצירת עסק + חיבור WhatsApp (דמו)
+2. `/dashboard` — סקירה + סימולטור
+3. `/dashboard/processes` — 7 התהליכים (גלים A–D)
+4. `/dashboard/inbox` — שיחות / השתלטות אנושית
+5. `/dashboard/connections` — WhatsApp + יומן + גבייה
+
+דף נחיתה בנפרד:
+
+```bash
 cd apps/landing && npm install && npm run dev
 ```
 
-סימולציית lead: `יש נזילה במטבח` → `היום אחה״צ` → `רמב״ן 14, ירושלים`
+## גלים (נעול)
 
-## WhatsApp חי
+| גל | תהליכים |
+|---|---|
+| A | Intake, Qualification, Booking |
+| B | Reminders, Retention |
+| C | Quote |
+| D | Payment (**אחרון**) |
 
-`.env.local` בשורש (ראו גם `.env.example`):
+## Meta Live
 
-```bash
-WHATSAPP_TOKEN=...
-WHATSAPP_PHONE_NUMBER_ID=...
-WHATSAPP_VERIFY_TOKEN=moked_verify
-```
-
-Webhook: `/api/whatsapp/webhook` · חיבור ייצור לפי הפסגה: **Embedded Signup ישיר מול Meta** (בלי BSP).
-
-## סטטוס workflows במערכת
-
-| id | סטטוס |
-|----|--------|
-| lead, quote, reminder | חי בסימולציה |
-| collect, dispatch, report, review | stubs |
-
-יישור לשמות גלי הפסגה (Intake / Qualification / Booking…) — הצעד הבא בפיתוח.
+העתיקו `.env.example` ל־`.env.local` (ראו משתני `META_*`).

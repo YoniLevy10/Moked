@@ -7,6 +7,7 @@ dist
 .env*.local
 .DS_Store
 *.log
+.data
 apps/landing/node_modules
 apps/landing/.next
 .vercel

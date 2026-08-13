@@ -1,50 +1,53 @@
-# MOKED — תמונת מצב סוכנים (13.08.2026)
+# MOKED — תמונת מצב (מעודכן)
 
-מסמך תיאום כדי שלא נבנה במקביל אותו דבר פעמיים.
+**דף נחיתה חי:** https://moked-ten.vercel.app  
+**PR מאוחד:** https://github.com/YoniLevy10/MOKED-/pull/3  
+**PRs שנסגרו אחרי איחוד:** #1 (תוכנית+אפליקציה), #2 (לוגו/landing ישן)
 
-## מי עשה מה
+---
 
-| סוכן | PR / בראנץ׳ | מה יצא | סטטוס |
-|------|-------------|--------|--------|
-| **לוגו + דף נחיתה** `bc-019ffb9b…29f8` | [#2](https://github.com/YoniLevy10/MOKED-/pull/2) `cursor/moked-landing-logo-29f8` | דף נחיתה מעוצב (RTL, Heebo/Outfit) + נכסי מותג | **מקור אמת לדף הנחיתה** — יובא ל־`apps/landing` |
-| **תוכנית פסגה WhatsApp** `bc-019ffba5…e822` | [#1](https://github.com/YoniLevy10/MOKED-/pull/1) `cursor/moked-whatsapp-onboarding-plan-e822` | `docs/MOKED-SUMMIT-PLAN.md` — החלטות נעולות | **מקור אמת לאסטרטגיה** — יובא ל־`docs/` |
-| **ייבוא מערכת + מונורפו** (הסוכן הזה) `bc-019ffb8c…cb75` | [#3](https://github.com/YoniLevy10/MOKED-/pull/3) `cursor/import-from-cloud-agent-cb75` | מנוע workflows, סימולציה, webhook, reminder | **מקור אמת למערכת** בשורש `app/` + `lib/` |
-| סוכן ראשון `bc-019ffb10…` | — | סשן בלי GitHub; סיכום הועבר ידנית | לא נגיש ישירות |
+## איפה אנחנו עכשיו
 
-## החלטות מוצר שנעלו (פסגה)
+| שכבה | מה יש | איפה |
+|------|--------|------|
+| דף נחיתה חי | שער שם־עסק+תחום+דילוג → דמו מותאם | https://moked-ten.vercel.app |
+| דף נחיתה בקוד | פורט של חוויית השער + לוגו חדש | `apps/landing` |
+| מערכת מוצר | Next.js + 7 גלים + onboarding/dashboard/inbox | `src/` (מ־PR #1) |
+| תוכנית פסגה | החלטות נעולות | `docs/MOKED-SUMMIT-PLAN.md` |
+| מותג | Apple icon + wordmark/mark | `public/brand/`, `public/apple-touch-icon.png` |
 
-- שוק: **ישראל בלבד**
-- WhatsApp: **Meta Cloud API ישיר** (בלי BSP; בלי Baileys/web.js)
-- סדר גלים: Intake→Qual→Booking → Reminders→Retention → Quote → **Payment אחרון**
-- עקרון: אוטומטי בשגרה · אנושי בהחלטות
-- מנוי פיילוט: ₪690 · WA: 972548102688
+---
 
-## מבנה מונורפו אחרי האיחוד
+## החלטות שנעלו (לא לפתוח מחדש בלי פסגה)
 
-```
-apps/landing/     ← דף הנחיתה מ־PR #2 (לא לבנות מחדש)
-app/ + lib/       ← מערכת הסימולציה + workflows
-docs/             ← תוכנית הפסגה
-public/brand/     ← לוגו mark + wordmark + apple-touch-icon
-```
+1. **שוק:** ישראל בלבד (עצמאים / עסקים קטנים)
+2. **WhatsApp:** Meta **Cloud API ישיר** + Embedded Signup — **בלי BSP**, בלי Baileys/web.js
+3. **סדר גלים:**  
+   A Intake→Qualification→Booking → B Reminders→Retention → C Quote → **D Payment אחרון**
+4. **עקרון מוצר:** אוטומטי בשגרה · אנושי בהחלטות · לא צ׳אטבוט כללי
+5. **פיילוט:** מנוי ₪690 · WhatsApp `972548102688`
+6. **צבע מותג:** `#087A55`
 
-## לוגו
+---
 
-- `public/brand/moked-mark-green.png` — סימן לאתר / hero
-- `public/apple-touch-icon.png` — Apple icon
-- `public/brand/moked-logo-wordmark.png` — wordmark ל־nav
+## מה נסגר / מה לא לגעת
 
-> אם יש קבצי מקור סופיים מהמשתמש — להחליף את הקבצים בנתיבים האלה (בלי לשנות מבנה).
+- לא לפתוח עוד PR מקביל לאותו ריפו בלי תיאום
+- לא לבנות דף נחיתה חלופי לדף החי
+- לא להקדים גבייה (גל D) לפני שיש Aha בגל A
 
-## מה לא לעשות
-
-- לא לפתוח עוד דף נחיתה בשורש הריפו
-- לא לשנות את סדר הגלים מתוכנית הפסגה
-- לא לחבר BSP / ספריות WhatsApp לא־רשמיות
+---
 
 ## הצעד הבא בפיתוח
 
-1. החלפת לוגו במקורות המשתמש (אם שונים מהקיימים)
-2. יישור שמות ה־7 workflows במערכת לפי גלי הפסגה (Intake/Qual/Booking…)
-3. Embedded Signup של Meta (דורש מפתחות)
-4. השלמת גל A בסימולציה ואז חי
+1. לחבר את `apps/landing` לפריסה (או להחליף את הפרויקט ב־Vercel למונורפו)
+2. Meta live: `META_APP_ID` / Embedded Signup / webhook
+3. להקשיח גל A בסימולציה ואז בחי
+4. DB קבוע (Postgres) במקום `.data/`
+
+## הרצה מקומית
+
+```bash
+npm install && npm run dev                 # מערכת :3000
+cd apps/landing && npm install && npm run dev  # נחיתה :3001
+```
