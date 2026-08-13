@@ -4,12 +4,14 @@
 
 ## קישורים
 
-| | מקומי | חי (דוגמה) |
-|--|--------|------------|
-| דף נחיתה | http://localhost:3001 (`apps/landing`) | https://moked-ten.vercel.app |
-| מערכת / Dashboard | http://localhost:3000 | פריסת האפליקציה ב־Vercel |
-| Superadmin | http://localhost:3000/superadmin | אותו דומיין מערכת |
-| כניסת מייל | http://localhost:3000/login | אותו דומיין מערכת |
+| | כתובת |
+|--|--------|
+| נחיתה (`/`) | https://temporary-express-spruce-8f7jo8m.vercel.app |
+| Dashboard | …/dashboard |
+| Login / Superadmin | …/login · …/superadmin |
+| דומיין היסטורי | `moked-ten.vercel.app` — כרגע 404 עד חיבור Vercel מחדש |
+
+פריסה אחת: שער הנחיתה ב־`/` והמערכת ב־`/dashboard`. שמירה לצמיתות: claim ב־Vercel + חיבור הפרויקט ל־GitHub.
 
 מסמכים: [`STATUS.md`](./STATUS.md) · [`docs/MOKED-SUMMIT-PLAN.md`](./docs/MOKED-SUMMIT-PLAN.md)
 
@@ -17,21 +19,19 @@
 
 ```bash
 npm install && npm run dev
-cd apps/landing && npm install && npm run dev
 ```
 
-### Superadmin (יצירת לקוחות)
+### Superadmin
 
 ב־`.env.local`:
 
 ```bash
 ADMIN_EMAILS=you@mail.com
 ADMIN_BOOTSTRAP_PASSWORD=moked-admin-change-me
+AUTH_SECRET=change-me
 ```
 
-ואז `/login` עם אותו מייל → `/superadmin`.
-
-אופציונלי (כמו Fixly): `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+ואז `/login` → `/superadmin`.
 
 ## גלים
 
@@ -40,7 +40,7 @@ ADMIN_BOOTSTRAP_PASSWORD=moked-admin-change-me
 | A | Intake, Qualification, Booking |
 | B | Reminders, Retention |
 | C | Quote |
-| D | Payment (אחרון; ספק `demo` לסימולציה) |
+| D | Payment (אחרון; ספק `demo`) |
 
 ```bash
 AUTO_SETUP=1 npm run smoke:wave-a
