@@ -1,21 +1,24 @@
 # MOKED — תמונת מצב
 
-**דף נחיתה חי:** https://moked-ten.vercel.app  
-**main:** מוזג מ־PR #3  
-**פיתוח נוכחי:** בראנץ׳ `cursor/wave-a-harden-cb75`
+## שני הקישורים (נכון)
+
+| מה | כתובת | תפקיד |
+|----|--------|--------|
+| **דף נחיתה / מכירה** | https://moked-ten.vercel.app · בקוד: `apps/landing` (:3001) | שער דמו ללקוחות פוטנציאליים |
+| **מערכת מלאה / Dashboard** | פריסת Vercel של האפליקציה · בקוד: `src/` (:3000) | onboarding, inbox, תהליכים, סימולטור |
+| **Superadmin** | `/superadmin` (אחרי כניסת מייל) | יצירת לקוחות מהירה בשבילך |
+| **כניסה** | `/login` | מייל+סיסמה (Supabase כשמוגדר / מקומי בפיתוח) |
 
 ---
 
-## איפה אנחנו
+## איפה אנחנו בפיתוח
 
-| שכבה | סטטוס |
-|------|--------|
-| מונורפו ב־`main` | ✅ אחרי מיזוג PR #3 |
-| מערכת `src/` | ✅ onboarding / dashboard / 7 גלים |
-| גל A (Intake→Qual→Booking+כתובת) | 🔧 מקשיחים עכשיו + סימולטור «הרץ גל A מלא» |
-| דף נחיתה `apps/landing` | ✅ שער דמו + קישור ל־`/onboarding` |
-| Meta live | ⏳ דורש מפתחות `META_*` |
-| DB קבוע | ⏳ עדיין `.data/` |
+| גל | תהליכים | סטטוס |
+|----|----------|--------|
+| A | Intake → Qualification → Booking+כתובת | ✅ |
+| B | Reminders (אישור/דחייה/ביטול) + Retention | ✅ מחוזק |
+| C | Quote (+ בקשת הנחה אנושית) | ✅ מחוזק |
+| D | Payment (ספק `demo` בדמו) | ✅ מחוזק לסימולציה |
 
 ---
 
@@ -23,17 +26,22 @@
 
 1. ישראל בלבד  
 2. Meta Cloud API ישיר (בלי BSP)  
-3. גלים A→B→C→**D Payment אחרון**  
+3. Payment אחרון  
 4. אוטומטי בשגרה · אנושי בהחלטות  
-5. פיילוט ₪690 · WA `972548102688` · צבע `#087A55`
+5. Superadmin לפי `ADMIN_EMAILS` (כמו Fixly)
 
 ---
 
-## הרצה / בדיקה
+## הרצה
 
 ```bash
-npm install && npm run dev
-# בדפדפן: /onboarding → חבר WhatsApp דמו → /dashboard → «הרץ גל A מלא»
+# מערכת
+npm i && npm run dev                 # :3000
 
-AUTO_SETUP=1 npm run smoke:wave-a
+# נחיתה
+cd apps/landing && npm i && npm run dev   # :3001
+
+# Superadmin מקומי
+# ב-.env.local: ADMIN_EMAILS=you@mail.com + ADMIN_BOOTSTRAP_PASSWORD=...
+# ואז /login עם אותו מייל
 ```

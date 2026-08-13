@@ -128,7 +128,7 @@ export const TenantSchema = z.object({
     .object({
       googleCalendar: z.boolean().default(false),
       paymentsProvider: z
-        .enum(["none", "grow", "payplus", "tranzila", "cardcom"])
+        .enum(["none", "demo", "grow", "payplus", "tranzila", "cardcom"])
         .default("none"),
       invoicingProvider: z
         .enum(["none", "icount", "morning", "greeninvoice"])

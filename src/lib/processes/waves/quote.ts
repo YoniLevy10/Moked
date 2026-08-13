@@ -4,6 +4,7 @@ export function handleQuote(ctx: ProcessContext): ProcessResult {
   const pricing = ctx.tenant.pricing;
   const state = ctx.conversation.processState ?? {};
   const quote = ctx.conversation.quote;
+  const text = ctx.inboundText.trim();
 
   if (!pricing.length) {
     return {
@@ -18,6 +19,18 @@ export function handleQuote(ctx: ProcessContext): ProcessResult {
     };
   }
 
+  if (state.awaitingDiscountDecision) {
+    return {
+      handled: true,
+      replies: [
+        {
+          body: "הבקשה להנחה ממתינה לאישור בעל העסק — אחזור אליך מיד אחרי ההחלטה.",
+          processKey: "quote",
+        },
+      ],
+    };
+  }
+
   if (!quote?.status || quote.status === "draft") {
     const lines = pricing
       .map((p, i) => `${i + 1}) ${p.name} — ₪${p.priceIls}`)
@@ -26,7 +39,7 @@ export function handleQuote(ctx: ProcessContext): ProcessResult {
       handled: true,
       replies: [
         {
-          body: `הנה ההצעות שלנו:\n${lines}\n\nהשב/י מספר לבחירה, או "לא תודה".`,
+          body: `הנה ההצעות שלנו:\n${lines}\n\nהשב/י מספר לבחירה, "הנחה", או "לא תודה".`,
           type: "interactive",
           processKey: "quote",
         },
@@ -40,7 +53,27 @@ export function handleQuote(ctx: ProcessContext): ProcessResult {
     };
   }
 
-  const text = ctx.inboundText.trim();
+  if (/הנחה|זול|יקר/i.test(text)) {
+    return {
+      handled: true,
+      replies: [
+        {
+          body: "קיבלתי בקשת הנחה — מעביר לבעל העסק לאישור (אנושי בהחלטות).",
+          processKey: "quote",
+        },
+      ],
+      conversationPatch: {
+        activeProcess: "quote",
+        processState: {
+          ...state,
+          awaitingDiscountDecision: true,
+          discountRequested: true,
+        },
+      },
+      events: ["quote.discount_requested", "human.decision_needed"],
+    };
+  }
+
   if (/לא|לא תודה|no/i.test(text)) {
     return {
       handled: true,
@@ -65,7 +98,7 @@ export function handleQuote(ctx: ProcessContext): ProcessResult {
       handled: true,
       replies: [
         {
-          body: "לא זיהיתי בחירה. השב/י מספר מהרשימה או \"לא תודה\".",
+          body: "לא זיהיתי בחירה. השב/י מספר מהרשימה, \"הנחה\", או \"לא תודה\".",
           processKey: "quote",
         },
       ],
@@ -80,7 +113,7 @@ export function handleQuote(ctx: ProcessContext): ProcessResult {
       {
         body: paymentEnabled
           ? `נהדר! בחרת "${item.name}" ב־₪${item.priceIls}. ממשיכים לגבייה.`
-          : `נהדר! בחרת "${item.name}" ב־₪${item.priceIls}.\nגבייה אוטומטית תתווסף כשגל D יופעל.`,
+          : `נהדר! בחרת "${item.name}" ב־₪${item.priceIls}.\nאפשר להפעיל גל D (גבייה) ממסך התהליכים.`,
         processKey: "quote",
       },
     ],
@@ -95,6 +128,7 @@ export function handleQuote(ctx: ProcessContext): ProcessResult {
         ...state,
         quoteAccepted: true,
         handoffToPayment: paymentEnabled,
+        awaitingDiscountDecision: false,
       },
     },
     events: ["quote.accepted"],

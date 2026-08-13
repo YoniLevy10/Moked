@@ -13,6 +13,8 @@
     "smoke:wave-a": "node scripts/smoke-wave-a.mjs"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.4",
+    "@supabase/supabase-js": "^2.112.3",
     "nanoid": "^6.0.1",
     "next": "16.3.0",
     "react": "19.2.8",

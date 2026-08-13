@@ -1,53 +1,47 @@
 # MOKED
 
-מוקד תפעולי לעצמאים בישראל — חיבור WhatsApp Cloud API בלחיצה, וסגירת 7 תהליכים לפי גלים.
+מוקד תפעולי לעצמאים בישראל — WhatsApp Cloud API + 7 תהליכים לפי גלים.
 
-**דף נחיתה חי:** https://moked-ten.vercel.app  
-**סטטוס מלא + החלטות:** [`STATUS.md`](./STATUS.md) · **תוכנית פסגה:** [`docs/MOKED-SUMMIT-PLAN.md`](./docs/MOKED-SUMMIT-PLAN.md)
+## קישורים
 
-## מבנה
+| | מקומי | חי (דוגמה) |
+|--|--------|------------|
+| דף נחיתה | http://localhost:3001 (`apps/landing`) | https://moked-ten.vercel.app |
+| מערכת / Dashboard | http://localhost:3000 | פריסת האפליקציה ב־Vercel |
+| Superadmin | http://localhost:3000/superadmin | אותו דומיין מערכת |
+| כניסת מייל | http://localhost:3000/login | אותו דומיין מערכת |
 
-| נתיב | תוכן |
-|------|------|
-| `src/` | אפליקציית המוצר (onboarding, dashboard, 7 גלים, WhatsApp APIs) |
-| `apps/landing/` | דף נחיתה (שער דמו) |
-| `public/brand/` | לוגו mark + wordmark |
-| `docs/` | תוכנית פסגה |
+מסמכים: [`STATUS.md`](./STATUS.md) · [`docs/MOKED-SUMMIT-PLAN.md`](./docs/MOKED-SUMMIT-PLAN.md)
 
 ## הרצה
 
 ```bash
 npm install && npm run dev
-```
-
-1. `/onboarding` — יצירת עסק + חיבור WhatsApp (דמו)
-2. `/dashboard` — סקירה + סימולטור
-3. `/dashboard/processes` — 7 התהליכים (גלים A–D)
-4. `/dashboard/inbox` — שיחות / השתלטות אנושית
-5. `/dashboard/connections` — WhatsApp + יומן + גבייה
-
-דף נחיתה בנפרד:
-
-```bash
 cd apps/landing && npm install && npm run dev
 ```
 
-## גלים (נעול)
+### Superadmin (יצירת לקוחות)
+
+ב־`.env.local`:
+
+```bash
+ADMIN_EMAILS=you@mail.com
+ADMIN_BOOTSTRAP_PASSWORD=moked-admin-change-me
+```
+
+ואז `/login` עם אותו מייל → `/superadmin`.
+
+אופציונלי (כמו Fixly): `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+
+## גלים
 
 | גל | תהליכים |
 |---|---|
 | A | Intake, Qualification, Booking |
 | B | Reminders, Retention |
 | C | Quote |
-| D | Payment (**אחרון**) |
-
-## Meta Live
-
-העתיקו `.env.example` ל־`.env.local` (ראו משתני `META_*`).
-
-## בדיקת גל A
+| D | Payment (אחרון; ספק `demo` לסימולציה) |
 
 ```bash
-# אחרי npm run dev + חיבור דמו, או:
 AUTO_SETUP=1 npm run smoke:wave-a
 ```

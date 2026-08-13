@@ -33,7 +33,7 @@ const PatchSchema = z.object({
     .object({
       googleCalendar: z.boolean().optional(),
       paymentsProvider: z
-        .enum(["none", "grow", "payplus", "tranzila", "cardcom"])
+        .enum(["none", "demo", "grow", "payplus", "tranzila", "cardcom"])
         .optional(),
       invoicingProvider: z
         .enum(["none", "icount", "morning", "greeninvoice"])

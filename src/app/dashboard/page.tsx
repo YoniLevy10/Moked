@@ -98,6 +98,32 @@ export default function DashboardHome() {
     }
   }
 
+  async function runWaveB(action: "reminder_t24" | "reminder_t2" | "retention") {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/demo/wave-b", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "שגיאה");
+      setSimLog((prev) => [
+        data.skipped
+          ? `גל B: דולג (${action})`
+          : `✓ גל B ${action} נשלח`,
+        ...prev,
+      ]);
+    } catch (e) {
+      setSimLog((prev) => [
+        e instanceof Error ? e.message : "שגיאה",
+        ...prev,
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   if (!tenant) {
     return (
       <div className="rounded-3xl border border-line bg-white/70 p-8">
@@ -192,6 +218,20 @@ export default function DashboardHome() {
             className="rounded-full border border-brand bg-white px-6 py-3 font-semibold text-brand hover:bg-brand/5 disabled:opacity-50"
           >
             הרץ גל A מלא
+          </button>
+          <button
+            onClick={() => void runWaveB("reminder_t24")}
+            disabled={loading || !status?.connected}
+            className="rounded-full border border-line bg-white px-4 py-3 text-sm font-semibold disabled:opacity-50"
+          >
+            תזכורת T-24
+          </button>
+          <button
+            onClick={() => void runWaveB("retention")}
+            disabled={loading || !status?.connected}
+            className="rounded-full border border-line bg-white px-4 py-3 text-sm font-semibold disabled:opacity-50"
+          >
+            שימור
           </button>
         </div>
 

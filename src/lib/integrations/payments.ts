@@ -1,14 +1,26 @@
-export type PaymentProvider = "grow" | "payplus" | "tranzila" | "cardcom";
+export type PaymentProvider =
+  | "demo"
+  | "grow"
+  | "payplus"
+  | "tranzila"
+  | "cardcom";
 
-/** Wave D stub — real provider SDKs plug in here later. */
+/** Wave D — demo provider works without Israeli PSP keys. */
 export function createPaymentLink(input: {
-  provider: PaymentProvider;
+  provider: PaymentProvider | "none";
   amountIls: number;
   description: string;
   tenantId: string;
   conversationId: string;
 }): { url: string; externalId: string } {
-  const externalId = `${input.provider}_${input.conversationId}_${Date.now()}`;
-  const url = `https://pay.moked.local/${input.provider}/checkout?amount=${input.amountIls}&ref=${externalId}`;
+  const provider = input.provider === "none" ? "demo" : input.provider;
+  const externalId = `${provider}_${input.conversationId}_${Date.now()}`;
+  if (provider === "demo") {
+    return {
+      url: `https://moked.local/demo-pay?amount=${input.amountIls}&ref=${externalId}`,
+      externalId,
+    };
+  }
+  const url = `https://pay.moked.local/${provider}/checkout?amount=${input.amountIls}&ref=${externalId}`;
   return { url, externalId };
 }
