@@ -36,7 +36,7 @@ export function LandingGate() {
         <div className="gate-card">
           <div className="gate-brand">
             <Image
-              src="/brand/moked-mark-black.png"
+              src="/brand/moked-mark-green.png"
               alt=""
               width={40}
               height={40}
@@ -108,7 +108,7 @@ export function LandingGate() {
       <header className="nav">
         <div className="gate-brand">
           <Image
-            src="/brand/moked-mark-black.png"
+            src="/brand/moked-mark-green.png"
             alt=""
             width={36}
             height={36}

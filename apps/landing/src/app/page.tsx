@@ -39,7 +39,7 @@ export default function LandingPage() {
         <div className="gate-card">
           <div className="gate-brand">
             <Image
-              src="/brand/moked-mark-black.png"
+              src="/brand/moked-mark-green.png"
               alt=""
               width={40}
               height={40}
@@ -110,7 +110,7 @@ export default function LandingPage() {
     <div className="demo-shell">
       <header className="nav">
         <div className="gate-brand">
-          <Image src="/brand/moked-mark-black.png" alt="" width={36} height={36} />
+          <Image src="/brand/moked-mark-green.png" alt="" width={36} height={36} />
           <Image
             src="/brand/moked-logo-wordmark.png"
             alt="MOKED"

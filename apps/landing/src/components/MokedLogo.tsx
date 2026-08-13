@@ -14,7 +14,7 @@ export function MokedLogo({
   if (variant === "mark") {
     return (
       <Image
-        src="/brand/moked-mark-black.png"
+        src="/brand/moked-mark-green.png"
         alt="MOKED"
         width={512}
         height={512}
