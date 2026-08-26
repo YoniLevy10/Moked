@@ -49,9 +49,12 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "שגיאת התחברות");
-      router.replace(
-        data.user?.role === "superadmin" ? "/superadmin" : next,
-      );
+      const dest =
+        data.user?.role === "superadmin" &&
+        (next === "/dashboard" || !params.get("next"))
+          ? "/superadmin"
+          : next;
+      router.replace(dest);
     } catch (err) {
       setError(err instanceof Error ? err.message : "שגיאה");
     } finally {

@@ -2,14 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { Tenant } from "@/lib/types";
+import { EmbeddedSignupButton } from "@/components/whatsapp/EmbeddedSignupButton";
 
 export default function ConnectionsPage() {
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function load() {
     const res = await fetch("/api/tenants");
     const data = await res.json();
+    if (!res.ok) {
+      setError(data.message ?? data.error ?? "שגיאה");
+      return;
+    }
     setTenant(data.active);
   }
 
@@ -18,6 +24,7 @@ export default function ConnectionsPage() {
   }, []);
 
   async function connectDemo() {
+    setError(null);
     const res = await fetch("/api/whatsapp/connect", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -25,7 +32,7 @@ export default function ConnectionsPage() {
     });
     const data = await res.json();
     if (!res.ok) {
-      setMsg(data.message ?? data.error);
+      setError(data.message ?? data.error);
       return;
     }
     setTenant(data.tenant);
@@ -48,8 +55,16 @@ export default function ConnectionsPage() {
     setMsg("החיבור עודכן");
   }
 
+  if (error && !tenant) {
+    return (
+      <div className="rounded-3xl border border-line bg-white/70 p-8">
+        <p className="text-danger">{error}</p>
+      </div>
+    );
+  }
+
   if (!tenant) {
-    return <p className="text-muted">אין עסק פעיל</p>;
+    return <p className="text-muted">טוען…</p>;
   }
 
   return (
@@ -66,23 +81,53 @@ export default function ConnectionsPage() {
         <p className="mt-2 text-sm text-muted">
           סטטוס:{" "}
           {tenant.whatsapp.connected
-            ? `מחובר (${tenant.whatsapp.mode})`
+            ? `מחובר (${tenant.whatsapp.mode}${
+                tenant.whatsapp.displayPhone
+                  ? ` · ${tenant.whatsapp.displayPhone}`
+                  : ""
+              })`
             : "לא מחובר"}
         </p>
-        {!tenant.whatsapp.connected && (
-          <button
-            onClick={() => void connectDemo()}
-            className="mt-4 rounded-full bg-brand px-5 py-2.5 font-semibold text-white"
-          >
-            חבר בדמו
-          </button>
-        )}
-        <div className="mt-4 rounded-2xl bg-paper-2 p-4 text-sm text-muted">
-          Live: הגדירו <code>META_APP_ID</code>,{" "}
-          <code>META_EMBEDDED_SIGNUP_CONFIG_ID</code>,{" "}
-          <code>META_WHATSAPP_TOKEN</code> ב־`.env.local` וחברו דרך Embedded
-          Signup.
+
+        <div className="mt-4 flex flex-col gap-3 sm:max-w-md">
+          <EmbeddedSignupButton
+            onConnected={() => {
+              setMsg("WhatsApp מחובר במצב חי ל-Meta");
+              void load();
+            }}
+            onError={setError}
+            className="rounded-full bg-brand px-5 py-2.5 font-semibold text-white disabled:opacity-60"
+            label={
+              tenant.whatsapp.connected && tenant.whatsapp.mode === "live"
+                ? "חבר מחדש ל-Meta"
+                : "חבר WhatsApp חי (Meta Embedded Signup)"
+            }
+          />
+          {(!tenant.whatsapp.connected || tenant.whatsapp.mode === "demo") && (
+            <button
+              onClick={() => void connectDemo()}
+              className="rounded-full border border-line px-5 py-2.5 font-semibold"
+            >
+              {tenant.whatsapp.connected
+                ? "השאר בדמו"
+                : "חבר בדמו (בלי Meta)"}
+            </button>
+          )}
         </div>
+
+        <div className="mt-4 rounded-2xl bg-paper-2 p-4 text-sm text-muted">
+          Webhook URL ל־Meta:{" "}
+          <code dir="ltr">
+            {(typeof window !== "undefined"
+              ? window.location.origin
+              : process.env.NEXT_PUBLIC_APP_URL) ?? ""}
+            /api/whatsapp/webhook
+          </code>
+          <br />
+          Verify token:{" "}
+          <code>META_WEBHOOK_VERIFY_TOKEN</code>
+        </div>
+        {error && <p className="mt-3 text-sm text-danger">{error}</p>}
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">

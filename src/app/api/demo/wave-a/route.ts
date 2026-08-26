@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getActiveTenant, listMessages } from "@/lib/store/db";
+import { listMessages } from "@/lib/store/db";
 import { handleInboundMessage } from "@/lib/processes/engine";
+import { requireTenantContext } from "@/lib/auth/tenant-context";
 
 const Schema = z.object({
   from: z.string().default("972501111111"),
@@ -25,10 +26,9 @@ const WAVE_A_SCRIPT = [
  * Useful for demos and smoke checks without Meta.
  */
 export async function POST(req: NextRequest) {
-  const tenant = await getActiveTenant();
-  if (!tenant) {
-    return NextResponse.json({ error: "no_tenant" }, { status: 400 });
-  }
+  const ctx = await requireTenantContext();
+  if (!ctx.ok) return ctx.response;
+  const tenant = ctx.tenant;
   if (!tenant.whatsapp.connected) {
     return NextResponse.json(
       { error: "whatsapp_not_connected" },

@@ -115,6 +115,59 @@ export async function getUserById(id: string): Promise<AuthUser | null> {
   return publicUser;
 }
 
+export async function getUserByEmail(email: string): Promise<AuthUser | null> {
+  await ensureBootstrapAdmin();
+  const db = await readAuth();
+  const user = db.users.find((u) => u.email === normalizeEmail(email));
+  if (!user) return null;
+  const publicUser = toPublic(user);
+  if (isAdminEmail(publicUser.email)) publicUser.role = "superadmin";
+  return publicUser;
+}
+
+/** Upsert a local auth record (e.g. after Supabase login) so sessions resolve. */
+export async function upsertExternalUser(input: {
+  id: string;
+  email: string;
+  name: string;
+  role?: AuthUser["role"];
+  tenantId?: string;
+}): Promise<AuthUser> {
+  const db = await readAuth();
+  const email = normalizeEmail(input.email);
+  const existingIdx = db.users.findIndex(
+    (u) => u.id === input.id || u.email === email,
+  );
+  const role =
+    input.role ??
+    (isAdminEmail(email) ? ("superadmin" as const) : ("owner" as const));
+  if (existingIdx >= 0) {
+    const prev = db.users[existingIdx];
+    db.users[existingIdx] = {
+      ...prev,
+      id: prev.id,
+      email,
+      name: input.name || prev.name,
+      role,
+      tenantId: input.tenantId ?? prev.tenantId,
+    };
+    await writeAuth(db);
+    return toPublic(db.users[existingIdx]);
+  }
+  const user = {
+    id: input.id,
+    email,
+    name: input.name,
+    role,
+    tenantId: input.tenantId,
+    passwordHash: hashPassword(nanoid(24)),
+    createdAt: new Date().toISOString(),
+  };
+  db.users.push(user);
+  await writeAuth(db);
+  return toPublic(user);
+}
+
 export async function listUsers(): Promise<AuthUser[]> {
   await ensureBootstrapAdmin();
   const db = await readAuth();

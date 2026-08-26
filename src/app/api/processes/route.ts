@@ -1,27 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  getActiveTenant,
-  getDb,
-  setProcessEnabled,
-} from "@/lib/store/db";
+import { getDb, setProcessEnabled } from "@/lib/store/db";
 import { PROCESS_CATALOG, ProcessKeySchema } from "@/lib/types";
 import {
   triggerReminder,
   triggerRetention,
 } from "@/lib/processes/engine";
+import { requireTenantContext } from "@/lib/auth/tenant-context";
 
 export async function GET() {
-  const tenant = await getActiveTenant();
-  if (!tenant) {
-    return NextResponse.json({ error: "no_tenant" }, { status: 400 });
-  }
+  const ctx = await requireTenantContext();
+  if (!ctx.ok) return ctx.response;
   const catalog = Object.values(PROCESS_CATALOG).sort(
     (a, b) => a.order - b.order,
   );
   return NextResponse.json({
     catalog,
-    enabled: tenant.processes,
+    enabled: ctx.tenant.processes,
   });
 }
 
@@ -31,12 +26,14 @@ const PatchSchema = z.object({
 });
 
 export async function PATCH(req: NextRequest) {
-  const tenant = await getActiveTenant();
-  if (!tenant) {
-    return NextResponse.json({ error: "no_tenant" }, { status: 400 });
-  }
+  const ctx = await requireTenantContext();
+  if (!ctx.ok) return ctx.response;
   const body = PatchSchema.parse(await req.json());
-  const updated = await setProcessEnabled(tenant.id, body.key, body.enabled);
+  const updated = await setProcessEnabled(
+    ctx.tenant.id,
+    body.key,
+    body.enabled,
+  );
   return NextResponse.json({ processes: updated.processes });
 }
 
@@ -46,25 +43,30 @@ const ActionSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const tenant = await getActiveTenant();
-  if (!tenant) {
-    return NextResponse.json({ error: "no_tenant" }, { status: 400 });
-  }
+  const ctx = await requireTenantContext();
+  if (!ctx.ok) return ctx.response;
   const body = ActionSchema.parse(await req.json());
   const db = await getDb();
   const conversation = db.conversations.find(
-    (c) => c.id === body.conversationId && c.tenantId === tenant.id,
+    (c) => c.id === body.conversationId && c.tenantId === ctx.tenant.id,
   );
   if (!conversation) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
   if (body.action === "send_retention") {
-    const result = await triggerRetention({ tenant, conversation });
+    const result = await triggerRetention({
+      tenant: ctx.tenant,
+      conversation,
+    });
     return NextResponse.json(result);
   }
 
   const kind = body.action === "send_reminder_t24" ? "t24" : "t2";
-  const result = await triggerReminder({ tenant, conversation, kind });
+  const result = await triggerReminder({
+    tenant: ctx.tenant,
+    conversation,
+    kind,
+  });
   return NextResponse.json(result);
 }

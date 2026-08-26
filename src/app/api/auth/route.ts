@@ -4,13 +4,14 @@ import {
   authenticateLocal,
   ensureBootstrapAdmin,
   registerOwner,
+  upsertExternalUser,
 } from "@/lib/auth/local-store";
 import {
   clearSessionCookie,
   getSessionUser,
   setSessionCookie,
 } from "@/lib/auth/session";
-import { isSupabaseAuthConfigured } from "@/lib/auth/shared";
+import { isAdminEmail, isSupabaseAuthConfigured } from "@/lib/auth/shared";
 import { getSupabaseAuthClient } from "@/lib/auth/supabase";
 
 export async function GET() {
@@ -55,15 +56,15 @@ export async function POST(req: NextRequest) {
     if (error || !data.user) {
       // Fall through to local demo auth so bootstrap admin still works.
     } else {
-      const user = {
+      const email = data.user.email ?? body.email;
+      const user = await upsertExternalUser({
         id: data.user.id,
-        email: data.user.email ?? body.email,
+        email,
         name:
           (data.user.user_metadata?.full_name as string) ||
           body.email.split("@")[0],
-        role: "owner" as const,
-        createdAt: data.user.created_at,
-      };
+        role: isAdminEmail(email) ? "superadmin" : "owner",
+      });
       await setSessionCookie(user);
       return NextResponse.json({ user, mode: "supabase" });
     }
