@@ -117,8 +117,24 @@ export const TenantSchema = z.object({
       accessToken: z.string().optional(),
       connectedAt: z.string().optional(),
       mode: z.enum(["demo", "live"]).default("demo"),
+      qualityRating: z
+        .enum(["GREEN", "YELLOW", "RED", "UNKNOWN"])
+        .optional(),
+      qualityCheckedAt: z.string().optional(),
+      messagingLimitTier: z.string().optional(),
     })
     .default({ connected: false, mode: "demo" }),
+  metaFeatures: z
+    .object({
+      callingEnabled: z.boolean().optional(),
+      groupsEnabled: z.boolean().optional(),
+      metaBusinessAgentEnabled: z.boolean().optional(),
+      qualificationFlowId: z.string().optional(),
+      qualificationFlowName: z.string().optional(),
+      bookingFlowId: z.string().optional(),
+      bookingFlowName: z.string().optional(),
+    })
+    .default({}),
   processes: z.record(
     ProcessKeySchema,
     z.object({
@@ -191,6 +207,16 @@ export const ConversationSchema = z.object({
       provider: z.string().optional(),
     })
     .optional(),
+  referral: z
+    .object({
+      sourceUrl: z.string().optional(),
+      sourceType: z.string().optional(),
+      sourceId: z.string().optional(),
+      body: z.string().optional(),
+      headline: z.string().optional(),
+    })
+    .optional(),
+  ctwaSourceId: z.string().optional(),
   updatedAt: z.string(),
   createdAt: z.string(),
 });
@@ -206,6 +232,15 @@ export const MessageSchema = z.object({
   type: z.enum(["text", "template", "interactive", "system"]).default("text"),
   processKey: ProcessKeySchema.optional(),
   metaMessageId: z.string().optional(),
+  deliveryStatus: z
+    .enum(["pending", "sent", "delivered", "read", "failed"])
+    .optional(),
+  deliveredAt: z.string().optional(),
+  readAt: z.string().optional(),
+  failedAt: z.string().optional(),
+  mediaUrl: z.string().optional(),
+  mediaMime: z.string().optional(),
+  interactivePayload: z.record(z.string(), z.unknown()).optional(),
   createdAt: z.string(),
 });
 

@@ -25,13 +25,22 @@
 
 ---
 
-## Meta (מוצר חי)
+## Meta Connectivity (מוצר חי)
 
-1. הגדירו ב־Vercel / `.env.local`: `META_APP_ID`, `META_APP_SECRET`, `META_EMBEDDED_SIGNUP_CONFIG_ID`, `META_WEBHOOK_VERIFY_TOKEN`
-2. ב־Meta App: Allowed domains + Webhook → `https://…/api/whatsapp/webhook`
-3. בדשבורד → חיבורים → **חבר WhatsApp חי (Embedded Signup)**
+1. Vercel / `.env.local`: `META_APP_ID`, `META_APP_SECRET`, `META_EMBEDDED_SIGNUP_CONFIG_ID`, `META_WEBHOOK_VERIFY_TOKEN` (+ אופציונלי `META_DATASET_ID`, `USD_ILS_RATE`)
+2. Meta App: Embedded Signup **v4**, domains, Webhook → `/api/whatsapp/webhook` (subscribe `messages`)
+3. הרץ מיגרציה: `supabase/migrations/20260908220000_meta_connectivity.sql`
+4. דשבורד → חיבורים → **חבר WhatsApp חי** → הגש תבניות עברית
 
-דמו נשאר זמין לפיתוח בלי Meta.
+| שכבה | יכולת | סטטוס קוד |
+|------|--------|-----------|
+| 0 | Webhook statuses + idempotency + ES v4 | ✅ |
+| 1 | Buttons / Lists / Location / Flows / Media client | ✅ |
+| 2 | Templates he + Quality monitor | ✅ |
+| 3 | Pricing analytics ₪ + CTWA scaffolding | ✅ |
+| 4 | Calling / Groups / Meta Agent (flags כבויים) | ✅ stubs |
+
+דמו נשאר זמין בלי Meta.
 
 ---
 
@@ -39,13 +48,13 @@
 
 | גל | תהליכים | סטטוס |
 |----|----------|--------|
-| A | Intake → Qualification → Booking+כתובת | ✅ |
-| B | Reminders + Retention | ✅ |
+| A | Intake → Qualification → Booking+כתובת | ✅ (+ interactive) |
+| B | Reminders + Retention | ✅ (+ templates) |
 | C | Quote (+ הנחה אנושית) | ✅ |
 | D | Payment (`demo`) | ✅ סימולציה |
 | Auth + מחיצות משטחים | — | ✅ |
-| Meta Embedded Signup | — | ✅ קוד מוכן (דורש credentials) |
-| **Postgres (Supabase)** | `pgsmselyieizacwdsdjl` | ✅ סכמה + חיבור קוד |
+| **Postgres (Supabase)** | `pgsmselyieizacwdsdjl` | ✅ |
+| **Meta Connectivity** | שכבות 0–4 | ✅ קוד (דורש credentials ל־Pilot) |
 
 DB: כשיש `SUPABASE_SERVICE_ROLE_KEY` האפליקציה כותבת ל־Supabase במקום `.data/db.json`.
 

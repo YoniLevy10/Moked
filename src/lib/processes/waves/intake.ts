@@ -52,6 +52,8 @@ export function handleIntake(ctx: ProcessContext): ProcessResult {
         intent: "spam",
         status: "closed",
         activeProcess: undefined,
+        referral: ctx.referral,
+        ctwaSourceId: ctx.referral?.sourceId,
       },
       events: ["lead.created", "intake.spam_filtered"],
     };
@@ -69,6 +71,8 @@ export function handleIntake(ctx: ProcessContext): ProcessResult {
       conversationPatch: {
         intent,
         activeProcess: undefined,
+        referral: ctx.referral,
+        ctwaSourceId: ctx.referral?.sourceId,
         processState: {
           ...ctx.conversation.processState,
           intakeDone: true,
@@ -88,10 +92,35 @@ export function handleIntake(ctx: ProcessContext): ProcessResult {
   ];
 
   if (qualificationEnabled) {
-    replies.push({
-      body: "מתי נוח שנתאם ביקור? (היום / מחר / השבוע / גמיש)",
-      processKey: "qualification",
-    });
+    const flowId = ctx.tenant.metaFeatures?.qualificationFlowId;
+    const flowName = ctx.tenant.metaFeatures?.qualificationFlowName;
+    if (flowId || flowName) {
+      replies.push({
+        body: "מלאו את השאלון הקצר להמשך:",
+        type: "interactive",
+        processKey: "qualification",
+        interactive: {
+          kind: "flow",
+          flowId,
+          flowName,
+          screen: "QUALIFY",
+        },
+      });
+    } else {
+      replies.push({
+        body: "מתי נוח שנתאם ביקור?",
+        type: "interactive",
+        processKey: "qualification",
+        interactive: {
+          kind: "buttons",
+          buttons: [
+            { id: "time_today", title: "היום" },
+            { id: "time_tomorrow", title: "מחר" },
+            { id: "time_week", title: "השבוע" },
+          ],
+        },
+      });
+    }
   }
 
   return {
@@ -100,6 +129,8 @@ export function handleIntake(ctx: ProcessContext): ProcessResult {
     conversationPatch: {
       intent,
       activeProcess: qualificationEnabled ? "qualification" : undefined,
+      referral: ctx.referral,
+      ctwaSourceId: ctx.referral?.sourceId,
       processState: {
         ...ctx.conversation.processState,
         intakeDone: true,
@@ -109,6 +140,11 @@ export function handleIntake(ctx: ProcessContext): ProcessResult {
         qualificationAnswers: [],
       },
     },
-    events: ["lead.created", "message.sent", "intake.completed"],
+    events: [
+      "lead.created",
+      "message.sent",
+      "intake.completed",
+      ...(ctx.referral?.sourceId ? ["ctwa.lead"] : []),
+    ],
   };
 }

@@ -1,5 +1,6 @@
 import { ProcessContext, ProcessResult } from "@/lib/processes/types";
 import { Conversation, Tenant } from "@/lib/types";
+import { HE_TEMPLATES } from "@/lib/whatsapp/he-templates";
 
 /** Wave B — proactive reminders (scheduler or dashboard trigger). */
 export function buildReminderMessages(
@@ -8,14 +9,40 @@ export function buildReminderMessages(
   kind: "t24" | "t2",
 ): ProcessResult {
   const when = conversation.booking?.confirmedAt ?? "המועד שנקבע";
+  const template =
+    kind === "t24" ? HE_TEMPLATES.reminder_t24 : HE_TEMPLATES.reminder_t2;
   const body =
     kind === "t24"
-      ? `תזכורת מ־${tenant.businessName}: מחר יש לך תור ל־${when}.\nהשב/י:\n• מאשר\n• לדחות\n• לבטל`
-      : `תזכורת: בעוד כשעתיים התור שלך (${when}).\nהשב/י "מאשר" / "לדחות" / "לבטל".`;
+      ? `תזכורת מ־${tenant.businessName}: מחר יש לך תור ל־${when}.\nהשב/י מאשר / לדחות / לבטל`
+      : `תזכורת: בעוד כשעתיים התור שלך (${when}).\nהשב/י מאשר / לדחות / לבטל.`;
 
   return {
     handled: true,
-    replies: [{ body, type: "template", processKey: "reminders" }],
+    replies: [
+      {
+        body,
+        type: "template",
+        processKey: "reminders",
+        template: {
+          name: template.name,
+          languageCode: "he",
+          bodyParameters: [tenant.businessName, when],
+        },
+      },
+      {
+        body: "בחרו פעולה:",
+        type: "interactive",
+        processKey: "reminders",
+        interactive: {
+          kind: "buttons",
+          buttons: [
+            { id: "remind_confirm", title: "מאשר" },
+            { id: "remind_reschedule", title: "לדחות" },
+            { id: "remind_cancel", title: "לבטל" },
+          ],
+        },
+      },
+    ],
     conversationPatch: {
       activeProcess: "reminders",
       booking: {
@@ -35,12 +62,14 @@ export function buildReminderMessages(
   };
 }
 
-export function handleReminderReply(
-  ctx: ProcessContext,
-): ProcessResult {
+export function handleReminderReply(ctx: ProcessContext): ProcessResult {
   const t = ctx.inboundText.trim();
+  const id = ctx.interactiveId;
 
-  if (/מאשר|מאשרת|כן|ok|אוקי/i.test(t)) {
+  if (
+    id === "remind_confirm" ||
+    /מאשר|מאשרת|כן|ok|אוקי/i.test(t)
+  ) {
     return {
       handled: true,
       replies: [
@@ -61,7 +90,7 @@ export function handleReminderReply(
     };
   }
 
-  if (/דח|מחר|יום אחר|להזיז/i.test(t)) {
+  if (id === "remind_reschedule" || /דח|מחר|יום אחר|להזיז/i.test(t)) {
     return {
       handled: true,
       replies: [
@@ -109,7 +138,7 @@ export function handleReminderReply(
     };
   }
 
-  if (/בטל|לא יכול|לא מגיע/i.test(t)) {
+  if (id === "remind_cancel" || /בטל|לא יכול|לא מגיע/i.test(t)) {
     return {
       handled: true,
       replies: [

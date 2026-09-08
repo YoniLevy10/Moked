@@ -10,7 +10,8 @@
     "lint": "eslint",
     "dev:landing": "npm --prefix apps/landing run dev",
     "build:landing": "npm --prefix apps/landing run build",
-    "smoke:wave-a": "node scripts/smoke-wave-a.mjs"
+    "smoke:wave-a": "node scripts/smoke-wave-a.mjs",
+    "smoke:meta-webhook": "node scripts/smoke-meta-webhook.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

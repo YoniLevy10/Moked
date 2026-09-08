@@ -159,6 +159,7 @@ export function EmbeddedSignupButton({
           setup: {},
           featureType: "",
           sessionInfoVersion: "3",
+          version: "v4",
         },
       },
     );

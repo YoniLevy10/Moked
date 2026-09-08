@@ -14,21 +14,22 @@ import {
 import { handleRetention } from "@/lib/processes/waves/retention";
 import { handleQuote } from "@/lib/processes/waves/quote";
 import { handlePayment } from "@/lib/processes/waves/payment";
-import { ProcessResult } from "@/lib/processes/types";
-import { sendWhatsAppText } from "@/lib/whatsapp/client";
+import { ProcessContext, ProcessResult } from "@/lib/processes/types";
+import {
+  isLiveWhatsApp,
+  sendOutboundAction,
+  sendTypingIndicator,
+} from "@/lib/whatsapp/client";
+import { isOutboundBlockedByQuality } from "@/lib/whatsapp/quality";
+import { sendCtwaConversion } from "@/lib/whatsapp/ctwa";
 
 function enabled(tenant: Tenant, key: ProcessKey): boolean {
   return Boolean(tenant.processes[key]?.enabled);
 }
 
-function runActiveProcess(
-  tenant: Tenant,
-  conversation: Conversation,
-  inboundText: string,
-): ProcessResult {
-  const ctx = { tenant, conversation, inboundText };
+function runActiveProcess(ctx: ProcessContext): ProcessResult {
+  const { tenant, conversation, inboundText } = ctx;
 
-  // Explicit intent keywords win over a stuck active process
   if (/הצעה|מחיר|כמה עולה/i.test(inboundText) && enabled(tenant, "quote")) {
     return handleQuote({
       ...ctx,
@@ -69,9 +70,10 @@ function runActiveProcess(
         booking: result.conversationPatch.booking ?? conversation.booking,
       };
       const booking = handleBooking({
-        tenant,
+        ...ctx,
         conversation: mid,
         inboundText: "",
+        interactiveId: undefined,
       });
       return {
         handled: true,
@@ -119,7 +121,7 @@ function runActiveProcess(
         },
       };
       const payment = handlePayment({
-        tenant,
+        ...ctx,
         conversation: mid,
         inboundText: "",
       });
@@ -144,11 +146,7 @@ function runActiveProcess(
   }
 
   if (enabled(tenant, "reminders") && conversation.booking?.confirmedAt) {
-    const reminder = handleReminderReply({
-      tenant,
-      conversation,
-      inboundText,
-    });
+    const reminder = handleReminderReply(ctx);
     if (reminder.handled) return reminder;
   }
 
@@ -186,12 +184,72 @@ function runActiveProcess(
   };
 }
 
+async function dispatchReplies(input: {
+  tenant: Tenant;
+  to: string;
+  conversationId: string;
+  replies: ProcessResult["replies"];
+}) {
+  const blocked =
+    isLiveWhatsApp(input.tenant) && isOutboundBlockedByQuality(input.tenant);
+
+  for (const reply of input.replies) {
+    const isProactiveTemplate = reply.type === "template";
+    if (blocked && isProactiveTemplate) {
+      await addMessage({
+        conversationId: input.conversationId,
+        tenantId: input.tenant.id,
+        direction: "outbound",
+        body: `[נחסם — quality RED] ${reply.body}`,
+        type: "system",
+        processKey: reply.processKey,
+        deliveryStatus: "failed",
+      });
+      continue;
+    }
+
+    // Live templates may fail if not approved — fall back to text/interactive body.
+    let send = await sendOutboundAction({
+      tenant: input.tenant,
+      to: input.to,
+      reply,
+    });
+    if (!send.ok && reply.type === "template") {
+      send = await sendOutboundAction({
+        tenant: input.tenant,
+        to: input.to,
+        reply: { ...reply, type: "text", template: undefined },
+      });
+    }
+
+    await addMessage({
+      conversationId: input.conversationId,
+      tenantId: input.tenant.id,
+      direction: "outbound",
+      body: reply.body,
+      type: reply.type ?? "text",
+      processKey: reply.processKey,
+      metaMessageId: send.id,
+      deliveryStatus: send.ok ? (send.demo ? "sent" : "pending") : "failed",
+      interactivePayload: reply.interactive
+        ? (reply.interactive as unknown as Record<string, unknown>)
+        : undefined,
+    });
+  }
+}
+
 export async function handleInboundMessage(input: {
   tenant: Tenant;
   customerWaId: string;
   customerName?: string;
   text: string;
   metaMessageId?: string;
+  interactiveId?: string;
+  locationAddress?: string;
+  flowResponseJson?: string;
+  referral?: Conversation["referral"];
+  mediaId?: string;
+  mediaMime?: string;
 }): Promise<{
   conversation: Conversation;
   result: ProcessResult;
@@ -206,13 +264,24 @@ export async function handleInboundMessage(input: {
     customerName: input.customerName,
   });
 
+  if (input.metaMessageId) {
+    void sendTypingIndicator({
+      tenant: input.tenant,
+      messageId: input.metaMessageId,
+    }).catch(() => undefined);
+  }
+
   await addMessage({
     conversationId: conversation.id,
     tenantId: input.tenant.id,
     direction: "inbound",
     body: input.text,
-    type: "text",
+    type: input.interactiveId ? "interactive" : "text",
     metaMessageId: input.metaMessageId,
+    mediaMime: input.mediaMime,
+    interactivePayload: input.interactiveId
+      ? { id: input.interactiveId }
+      : undefined,
   });
 
   if (conversation.status === "human_takeover") {
@@ -222,7 +291,17 @@ export async function handleInboundMessage(input: {
     };
   }
 
-  const result = runActiveProcess(input.tenant, conversation, input.text);
+  const ctx: ProcessContext = {
+    tenant: input.tenant,
+    conversation,
+    inboundText: input.text,
+    interactiveId: input.interactiveId,
+    locationAddress: input.locationAddress,
+    flowResponseJson: input.flowResponseJson,
+    referral: input.referral ?? conversation.referral,
+  };
+
+  const result = runActiveProcess(ctx);
 
   if (result.conversationPatch) {
     conversation = await updateConversation(
@@ -231,20 +310,27 @@ export async function handleInboundMessage(input: {
     );
   }
 
-  for (const reply of result.replies) {
-    await sendWhatsAppText({
+  await dispatchReplies({
+    tenant: input.tenant,
+    to: input.customerWaId,
+    conversationId: conversation.id,
+    replies: result.replies,
+  });
+
+  if (result.events?.includes("booking.confirmed") || result.events?.includes("ctwa.convert_booking")) {
+    void sendCtwaConversion({
       tenant: input.tenant,
-      to: input.customerWaId,
-      body: reply.body,
-    });
-    await addMessage({
-      conversationId: conversation.id,
-      tenantId: input.tenant.id,
-      direction: "outbound",
-      body: reply.body,
-      type: reply.type ?? "text",
-      processKey: reply.processKey,
-    });
+      eventName: "Schedule",
+      ctwaSourceId: conversation.ctwaSourceId ?? conversation.referral?.sourceId,
+    }).catch(() => undefined);
+  }
+  if (result.events?.includes("payment.paid") || conversation.payment?.status === "paid") {
+    void sendCtwaConversion({
+      tenant: input.tenant,
+      eventName: "Purchase",
+      ctwaSourceId: conversation.ctwaSourceId ?? conversation.referral?.sourceId,
+      valueIls: conversation.quote?.amountIls,
+    }).catch(() => undefined);
   }
 
   return { conversation, result };
@@ -258,6 +344,9 @@ export async function triggerReminder(input: {
   if (!enabled(input.tenant, "reminders")) {
     return { skipped: true as const };
   }
+  if (isOutboundBlockedByQuality(input.tenant)) {
+    return { skipped: true as const, reason: "quality_red" as const };
+  }
   const result = buildReminderMessages(
     input.tenant,
     input.conversation,
@@ -266,21 +355,12 @@ export async function triggerReminder(input: {
   if (result.conversationPatch) {
     await updateConversation(input.conversation.id, result.conversationPatch);
   }
-  for (const reply of result.replies) {
-    await sendWhatsAppText({
-      tenant: input.tenant,
-      to: input.conversation.customerWaId,
-      body: reply.body,
-    });
-    await addMessage({
-      conversationId: input.conversation.id,
-      tenantId: input.tenant.id,
-      direction: "outbound",
-      body: reply.body,
-      type: "template",
-      processKey: "reminders",
-    });
-  }
+  await dispatchReplies({
+    tenant: input.tenant,
+    to: input.conversation.customerWaId,
+    conversationId: input.conversation.id,
+    replies: result.replies,
+  });
   return { skipped: false as const, result };
 }
 
@@ -289,6 +369,9 @@ export async function triggerRetention(input: {
   conversation: Conversation;
 }) {
   if (!enabled(input.tenant, "retention")) return { skipped: true as const };
+  if (isOutboundBlockedByQuality(input.tenant)) {
+    return { skipped: true as const, reason: "quality_red" as const };
+  }
   const result = handleRetention({
     tenant: input.tenant,
     conversation: input.conversation,
@@ -297,20 +380,11 @@ export async function triggerRetention(input: {
   if (result.conversationPatch) {
     await updateConversation(input.conversation.id, result.conversationPatch);
   }
-  for (const reply of result.replies) {
-    await sendWhatsAppText({
-      tenant: input.tenant,
-      to: input.conversation.customerWaId,
-      body: reply.body,
-    });
-    await addMessage({
-      conversationId: input.conversation.id,
-      tenantId: input.tenant.id,
-      direction: "outbound",
-      body: reply.body,
-      type: "template",
-      processKey: "retention",
-    });
-  }
+  await dispatchReplies({
+    tenant: input.tenant,
+    to: input.conversation.customerWaId,
+    conversationId: input.conversation.id,
+    replies: result.replies,
+  });
   return { skipped: false as const, result };
 }

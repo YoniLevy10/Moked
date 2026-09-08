@@ -36,6 +36,10 @@ type TenantRow = {
   payments_provider: Tenant["integrations"]["paymentsProvider"];
   invoicing_provider: Tenant["integrations"]["invoicingProvider"];
   google_reviews_url: string | null;
+  quality_rating?: string | null;
+  quality_checked_at?: string | null;
+  messaging_limit_tier?: string | null;
+  meta_features?: Record<string, unknown> | null;
   created_at: string;
 };
 
@@ -82,6 +86,8 @@ type ConversationRow = {
   payment_status: NonNullable<Conversation["payment"]>["status"];
   payment_provider: string | null;
   payment_external_id: string | null;
+  ctwa_source_id?: string | null;
+  referral?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 };
@@ -95,6 +101,13 @@ type MessageRow = {
   type: Message["type"];
   process_key: ProcessKey | null;
   meta_message_id: string | null;
+  delivery_status?: string | null;
+  delivered_at?: string | null;
+  read_at?: string | null;
+  failed_at?: string | null;
+  media_url?: string | null;
+  media_mime?: string | null;
+  interactive_payload?: Record<string, unknown> | null;
   created_at: string;
 };
 
@@ -143,7 +156,11 @@ function mapTenant(
       displayPhone: row.display_phone ?? undefined,
       accessToken: secret?.whatsapp_access_token ?? undefined,
       connectedAt: row.whatsapp_connected_at ?? undefined,
+      qualityRating: (row.quality_rating as Tenant["whatsapp"]["qualityRating"]) ?? undefined,
+      qualityCheckedAt: row.quality_checked_at ?? undefined,
+      messagingLimitTier: row.messaging_limit_tier ?? undefined,
     },
+    metaFeatures: (row.meta_features as Tenant["metaFeatures"]) ?? {},
     processes,
     integrations: {
       googleCalendar: row.google_calendar,
@@ -214,6 +231,10 @@ function mapConversation(row: ConversationRow): Conversation {
           provider: row.payment_provider ?? undefined,
         }
       : undefined,
+    referral: row.referral
+      ? (row.referral as Conversation["referral"])
+      : undefined,
+    ctwaSourceId: row.ctwa_source_id ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -229,6 +250,13 @@ function mapMessage(row: MessageRow): Message {
     type: row.type,
     processKey: row.process_key ?? undefined,
     metaMessageId: row.meta_message_id ?? undefined,
+    deliveryStatus: (row.delivery_status as Message["deliveryStatus"]) ?? undefined,
+    deliveredAt: row.delivered_at ?? undefined,
+    readAt: row.read_at ?? undefined,
+    failedAt: row.failed_at ?? undefined,
+    mediaUrl: row.media_url ?? undefined,
+    mediaMime: row.media_mime ?? undefined,
+    interactivePayload: row.interactive_payload ?? undefined,
     createdAt: row.created_at,
   };
 }
@@ -616,6 +644,14 @@ export async function updateConversation(
       payment_link_url: payment?.linkUrl ?? null,
       payment_status: payment?.status ?? "none",
       payment_provider: payment?.provider ?? null,
+      ctwa_source_id:
+        patch.ctwaSourceId !== undefined
+          ? patch.ctwaSourceId
+          : current.ctwaSourceId ?? null,
+      referral:
+        patch.referral !== undefined
+          ? patch.referral
+          : current.referral ?? null,
     })
     .eq("id", conversationId)
     .select("*")
@@ -639,11 +675,95 @@ export async function addMessage(
       type: input.type ?? "text",
       process_key: input.processKey ?? null,
       meta_message_id: input.metaMessageId ?? null,
+      delivery_status: input.deliveryStatus ?? (input.direction === "outbound" ? "pending" : null),
+      media_url: input.mediaUrl ?? null,
+      media_mime: input.mediaMime ?? null,
+      interactive_payload: input.interactivePayload ?? null,
     })
     .select("*")
     .single();
   if (error) throw error;
   return mapMessage(data as MessageRow);
+}
+
+export async function updateMessageDeliveryByMetaId(
+  metaMessageId: string,
+  status: "sent" | "delivered" | "read" | "failed" | string,
+  atIso?: string,
+): Promise<boolean> {
+  if (!useRemote()) return false;
+  const sb = getSupabaseAdmin();
+  const ts = atIso
+    ? new Date(Number(atIso) * 1000).toISOString()
+    : new Date().toISOString();
+  const patch: Record<string, unknown> = {
+    delivery_status: status,
+  };
+  if (status === "delivered") patch.delivered_at = ts;
+  if (status === "read") patch.read_at = ts;
+  if (status === "failed") patch.failed_at = ts;
+  const { data, error } = await sb
+    .from("messages")
+    .update(patch)
+    .eq("meta_message_id", metaMessageId)
+    .select("id")
+    .maybeSingle();
+  if (error) throw error;
+  return Boolean(data);
+}
+
+/** Returns true if this event is new (inserted). False if duplicate. */
+export async function claimWebhookEvent(
+  id: string,
+  tenantId: string | null,
+  payload: unknown,
+): Promise<boolean> {
+  if (!useRemote()) return true;
+  const sb = getSupabaseAdmin();
+  const { error } = await sb.from("webhook_events").insert({
+    id,
+    tenant_id: tenantId,
+    payload: payload ?? {},
+  });
+  if (error) {
+    if (error.code === "23505") return false;
+    throw error;
+  }
+  return true;
+}
+
+export async function updateTenantQuality(
+  tenantId: string,
+  input: {
+    qualityRating: "GREEN" | "YELLOW" | "RED" | "UNKNOWN";
+    messagingLimitTier?: string;
+  },
+): Promise<Tenant> {
+  if (!useRemote()) {
+    const current = await fileStore.getTenantById(tenantId);
+    if (!current) throw new Error("Tenant not found");
+    return fileStore.updateTenant(tenantId, {
+      whatsapp: {
+        ...current.whatsapp,
+        qualityRating: input.qualityRating,
+        qualityCheckedAt: new Date().toISOString(),
+        messagingLimitTier: input.messagingLimitTier,
+      },
+    });
+  }
+  const sb = getSupabaseAdmin();
+  const { error } = await sb
+    .from("tenants")
+    .update({
+      quality_rating: input.qualityRating,
+      quality_checked_at: new Date().toISOString(),
+      messaging_limit_tier: input.messagingLimitTier ?? null,
+    })
+    .eq("id", tenantId);
+  if (error) throw error;
+  const tenant = await getTenantById(tenantId);
+  if (!tenant) throw new Error("Tenant not found");
+  return tenant;
 }
 
 export async function listConversations(tenantId: string): Promise<

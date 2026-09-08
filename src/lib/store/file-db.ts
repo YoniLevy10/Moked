@@ -99,6 +99,7 @@ export async function createTenant(input: {
     locale: "he-IL",
     createdAt: now,
     whatsapp: { connected: false, mode: "demo" },
+    metaFeatures: {},
     processes: defaultProcesses(),
     integrations: {
       googleCalendar: false,
