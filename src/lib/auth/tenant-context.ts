@@ -5,6 +5,7 @@ import {
   requireSessionUser,
   requireSuperadmin,
 } from "@/lib/auth/session";
+import { linkUserToTenant } from "@/lib/auth/local-store";
 import {
   getActiveTenant,
   getTenantById,
@@ -82,6 +83,13 @@ export async function requireSuperadminContext(): Promise<
 }
 
 /** Superadmin switches which tenant the dashboard APIs see. */
-export async function switchActiveTenant(tenantId: string): Promise<Tenant> {
-  return setActiveTenantId(tenantId);
+export async function switchActiveTenant(
+  tenantId: string,
+  userId?: string,
+): Promise<Tenant> {
+  const tenant = await setActiveTenantId(tenantId);
+  if (userId) {
+    await linkUserToTenant(userId, tenantId);
+  }
+  return tenant;
 }

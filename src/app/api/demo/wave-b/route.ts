@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getDb } from "@/lib/store/db";
+import { getConversationById, listConversations } from "@/lib/store/db";
 import { triggerReminder, triggerRetention } from "@/lib/processes/engine";
 import { requireTenantContext } from "@/lib/auth/tenant-context";
 
@@ -16,18 +16,17 @@ export async function POST(req: NextRequest) {
   const tenant = ctx.tenant;
 
   const body = Schema.parse(await req.json());
-  const db = await getDb();
-  const conversation =
-    (body.conversationId
-      ? db.conversations.find(
-          (c) => c.id === body.conversationId && c.tenantId === tenant.id,
-        )
-      : db.conversations.find(
-          (c) =>
-            c.tenantId === tenant.id &&
-            c.booking?.confirmedAt &&
-            c.status === "open",
-        )) ?? null;
+  let conversation = body.conversationId
+    ? await getConversationById(body.conversationId)
+    : null;
+  if (conversation && conversation.tenantId !== tenant.id) {
+    conversation = null;
+  }
+  if (!conversation) {
+    const all = await listConversations(tenant.id);
+    conversation =
+      all.find((c) => c.booking?.confirmedAt && c.status === "open") ?? null;
+  }
 
   if (!conversation) {
     return NextResponse.json(

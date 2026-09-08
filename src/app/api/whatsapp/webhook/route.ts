@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/store/db";
+import { getTenantByPhoneNumberId } from "@/lib/store/db";
 import { handleInboundMessage } from "@/lib/processes/engine";
 import { verifyMetaSignature } from "@/lib/whatsapp/client";
 import { parseInboundMessages } from "@/lib/whatsapp/webhook";
@@ -31,16 +31,10 @@ export async function POST(req: NextRequest) {
   }
 
   const inbound = parseInboundMessages(payload);
-  const db = await getDb();
   const results = [];
 
   for (const msg of inbound) {
-    const tenant = db.tenants.find(
-      (t) =>
-        t.whatsapp.connected &&
-        t.whatsapp.phoneNumberId === msg.phoneNumberId,
-    );
-
+    const tenant = await getTenantByPhoneNumberId(msg.phoneNumberId);
     if (!tenant) continue;
 
     const handled = await handleInboundMessage({

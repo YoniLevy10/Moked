@@ -11,7 +11,7 @@ import {
   getSessionUser,
   setSessionCookie,
 } from "@/lib/auth/session";
-import { isAdminEmail, isSupabaseAuthConfigured } from "@/lib/auth/shared";
+import { isAdminEmail, isSupabaseAuthConfigured, isSupabaseDbConfigured } from "@/lib/auth/shared";
 import { getSupabaseAuthClient } from "@/lib/auth/supabase";
 
 export async function GET() {
@@ -20,7 +20,8 @@ export async function GET() {
   return NextResponse.json({
     user,
     supabaseConfigured: isSupabaseAuthConfigured(),
-    mode: isSupabaseAuthConfigured() ? "supabase" : "local",
+    db: isSupabaseDbConfigured() ? "supabase" : "file",
+    mode: isSupabaseDbConfigured() ? "supabase" : "local",
   });
 }
 
@@ -78,7 +79,10 @@ export async function POST(req: NextRequest) {
         name: body.name || body.email.split("@")[0],
       });
       await setSessionCookie(user);
-      return NextResponse.json({ user, mode: "local" }, { status: 201 });
+      return NextResponse.json(
+        { user, mode: isSupabaseDbConfigured() ? "supabase" : "local" },
+        { status: 201 },
+      );
     } catch (e) {
       const msg = e instanceof Error ? e.message : "error";
       return NextResponse.json({ error: msg }, { status: 400 });

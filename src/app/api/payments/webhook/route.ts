@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb, updateConversation, addMessage } from "@/lib/store/db";
+import {
+  addMessage,
+  getConversationById,
+  getTenantById,
+  updateConversation,
+} from "@/lib/store/db";
 import { createInvoiceDraft } from "@/lib/integrations/invoicing";
 
 /**
@@ -17,13 +22,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "missing_conversationId" }, { status: 400 });
   }
 
-  const db = await getDb();
-  const conversation = db.conversations.find((c) => c.id === body.conversationId);
+  const conversation = await getConversationById(body.conversationId);
   if (!conversation) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
-  const tenant = db.tenants.find((t) => t.id === conversation.tenantId);
+  const tenant = await getTenantById(conversation.tenantId);
   if (!tenant) {
     return NextResponse.json({ error: "tenant_missing" }, { status: 400 });
   }

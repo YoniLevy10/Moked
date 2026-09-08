@@ -113,8 +113,8 @@ export async function PATCH(req: NextRequest) {
   if (!ctx.ok) return ctx.response;
   const body = PatchSchema.parse(await req.json());
   try {
-    const tenant = await switchActiveTenant(body.tenantId);
-    return NextResponse.json({ tenant, activeTenantId: tenant.id });
+  const tenant = await switchActiveTenant(body.tenantId, ctx.user.id);
+  return NextResponse.json({ tenant, activeTenantId: tenant.id });
   } catch {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
