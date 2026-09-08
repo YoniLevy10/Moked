@@ -45,6 +45,9 @@
 | D | Payment (`demo`) | ✅ סימולציה |
 | Auth + מחיצות משטחים | — | ✅ |
 | Meta Embedded Signup | — | ✅ קוד מוכן (דורש credentials) |
+| **Postgres (Supabase)** | `pgsmselyieizacwdsdjl` | ✅ סכמה + חיבור קוד |
+
+DB: כשיש `SUPABASE_SERVICE_ROLE_KEY` האפליקציה כותבת ל־Supabase במקום `.data/db.json`.
 
 ---
 

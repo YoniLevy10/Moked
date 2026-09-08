@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getDb, setProcessEnabled } from "@/lib/store/db";
+import { getConversationById, setProcessEnabled } from "@/lib/store/db";
 import { PROCESS_CATALOG, ProcessKeySchema } from "@/lib/types";
 import {
   triggerReminder,
@@ -46,11 +46,8 @@ export async function POST(req: NextRequest) {
   const ctx = await requireTenantContext();
   if (!ctx.ok) return ctx.response;
   const body = ActionSchema.parse(await req.json());
-  const db = await getDb();
-  const conversation = db.conversations.find(
-    (c) => c.id === body.conversationId && c.tenantId === ctx.tenant.id,
-  );
-  if (!conversation) {
+  const conversation = await getConversationById(body.conversationId);
+  if (!conversation || conversation.tenantId !== ctx.tenant.id) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
