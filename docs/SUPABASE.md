@@ -11,7 +11,8 @@
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://pgsmselyieizacwdsdjl.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon>
+# אפשר גם בלי PUBLIC — הקוד מקבל את שניהם:
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon>   # או SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY=<service_role>   # שרת בלבד — לא לדפדפן / לא לגיט
 ```
 
