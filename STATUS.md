@@ -1,5 +1,9 @@
 # MOKED — תמונת מצב
 
+## בידול (חובה)
+
+ראו [`docs/MOKED-DIFFERENTIATION.md`](./docs/MOKED-DIFFERENTIATION.md): MOKED = מערכת תפעולית לתוצאות עסקיות, לא בוט WhatsApp. הדשבורד מציג לידים / תורים / הכנסות / שימור — לא ספירת הודעות.
+
 ## קישורים חיים
 
 | מה | כתובת |
@@ -20,7 +24,7 @@
 |------|-----|-----|
 | נחיתה `/` | כולם | דמו שיווקי + CTAs להתחברות |
 | Onboarding | בעל עסק מחובר | הקמת עסק + חיבור WhatsApp (Meta / דמו) |
-| Dashboard | בעל עסק / superadmin על טננט פעיל | תפעול, תהליכים, חיבורים |
+| Dashboard | בעל עסק / superadmin על טננט פעיל | תוצאות עסקיות, תהליכים, חיבורים |
 | Superadmin | `ADMIN_EMAILS` בלבד | יצירת לקוחות + חשבון בעלים + מעבר לדשבורד |
 
 ---
@@ -46,8 +50,11 @@
 | Auth + מחיצות משטחים | — | ✅ |
 | Meta Embedded Signup | — | ✅ קוד מוכן (דורש credentials) |
 | **Postgres (Supabase)** | `pgsmselyieizacwdsdjl` | ✅ סכמה + חיבור קוד |
+| **Business events + Outcomes** | `/api/outcomes` | ✅ אירועים מתמשכים + KPI בדשבורד |
+| Channel adapter | `src/lib/channels` | ✅ מנוע לא תלוי ישירות ב־Meta |
 
 DB: כשיש `SUPABASE_SERVICE_ROLE_KEY` האפליקציה כותבת ל־Supabase במקום `.data/db.json`.
+מיגרציית אירועים: `supabase/migrations/20260908225400_business_events.sql` (להריץ על הפרויקט אם עדיין לא).
 
 ---
 

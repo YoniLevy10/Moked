@@ -159,7 +159,7 @@ export type Tenant = z.infer<typeof TenantSchema>;
 export const ConversationSchema = z.object({
   id: z.string(),
   tenantId: z.string(),
-  customerWaId: z.string(),
+  customerWaId: z.string(), // external channel identity (WhatsApp phone today; rename-safe)
   customerName: z.string().optional(),
   status: z.enum(["open", "human_takeover", "closed"]).default("open"),
   leadScore: z.number().optional(),

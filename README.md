@@ -1,6 +1,6 @@
 # MOKED
 
-מוקד תפעולי לעצמאים בישראל — WhatsApp Cloud API + 7 תהליכים לפי גלים.
+מוקד תפעולי לעצמאים בישראל — ממיר שיחות לתוצאות עסקיות מדידות (לידים, תורים, הכנסות, שימור). WhatsApp הוא ערוץ תקשורת; הלוגיקה והנתונים בבעלות MOKED.
 
 ## קישורים
 
@@ -12,7 +12,7 @@
 
 פריסה אחת: שער הנחיתה ב־`/` והמערכת ב־`/dashboard`.
 
-מסמכים: [`STATUS.md`](./STATUS.md) · [`docs/MOKED-SUMMIT-PLAN.md`](./docs/MOKED-SUMMIT-PLAN.md)
+מסמכים: [`STATUS.md`](./STATUS.md) · [`docs/MOKED-DIFFERENTIATION.md`](./docs/MOKED-DIFFERENTIATION.md) · [`docs/MOKED-SUMMIT-PLAN.md`](./docs/MOKED-SUMMIT-PLAN.md)
 
 ## הרצה
 
