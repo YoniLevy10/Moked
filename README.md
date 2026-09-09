@@ -12,7 +12,11 @@
 
 פריסה אחת: שער הנחיתה ב־`/` והמערכת ב־`/dashboard`.
 
+<<<<<<< HEAD
 מסמכים: [`STATUS.md`](./STATUS.md) · [`docs/MOKED-DIFFERENTIATION.md`](./docs/MOKED-DIFFERENTIATION.md) · [`docs/MOKED-SUMMIT-PLAN.md`](./docs/MOKED-SUMMIT-PLAN.md)
+=======
+מסמכים: [`STATUS.md`](./STATUS.md) · [`docs/MOKED-SUMMIT-PLAN.md`](./docs/MOKED-SUMMIT-PLAN.md) · [`docs/SUPABASE.md`](./docs/SUPABASE.md) · [`docs/META-CAPABILITY-AND-MARKET.md`](./docs/META-CAPABILITY-AND-MARKET.md)
+>>>>>>> origin/main
 
 ## הרצה
 
