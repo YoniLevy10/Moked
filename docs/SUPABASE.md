@@ -21,3 +21,5 @@ SUPABASE_SERVICE_ROLE_KEY=<service_role>   # שרת בלבד — לא לדפדפ
 ## מיגרציה
 
 `supabase/migrations/20260908210000_moked_core.sql` — כבר הורצה על הפרויקט.
+
+`supabase/migrations/20260908225400_business_events.sql` — טבלת `business_events` לאירועים עסקיים מדידים (תוצאות דשבורד). להריץ אם עדיין לא קיימת.

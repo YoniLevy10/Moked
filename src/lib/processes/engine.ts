@@ -1,4 +1,5 @@
 import {
+  addBusinessEvents,
   addMessage,
   getOrCreateConversation,
   updateConversation,
@@ -15,7 +16,8 @@ import { handleRetention } from "@/lib/processes/waves/retention";
 import { handleQuote } from "@/lib/processes/waves/quote";
 import { handlePayment } from "@/lib/processes/waves/payment";
 import { ProcessResult } from "@/lib/processes/types";
-import { sendWhatsAppText } from "@/lib/whatsapp/client";
+import { resolveChannel } from "@/lib/channels";
+import { MessagingChannel } from "@/lib/channels/types";
 
 function enabled(tenant: Tenant, key: ProcessKey): boolean {
   return Boolean(tenant.processes[key]?.enabled);
@@ -186,8 +188,75 @@ function runActiveProcess(
   };
 }
 
+function eventPayloadFor(
+  eventType: string,
+  conversation: Conversation,
+): Record<string, unknown> {
+  const payload: Record<string, unknown> = {};
+  if (conversation.leadScore != null) payload.leadScore = conversation.leadScore;
+  if (conversation.intent) payload.intent = conversation.intent;
+  if (
+    eventType === "quote.accepted" ||
+    eventType === "quote.sent" ||
+    eventType === "payment.paid" ||
+    eventType === "payment.link_sent"
+  ) {
+    if (conversation.quote?.amountIls != null) {
+      payload.amountIls = conversation.quote.amountIls;
+    }
+  }
+  if (eventType === "booking.confirmed" && conversation.booking?.confirmedAt) {
+    payload.confirmedAt = conversation.booking.confirmedAt;
+  }
+  return payload;
+}
+
+async function persistEvents(
+  tenant: Tenant,
+  conversation: Conversation,
+  eventTypes: string[] | undefined,
+  channel: MessagingChannel,
+) {
+  if (!eventTypes?.length) return;
+  await addBusinessEvents(
+    eventTypes.map((eventType) => ({
+      tenantId: tenant.id,
+      conversationId: conversation.id,
+      eventType,
+      payload: eventPayloadFor(eventType, conversation),
+      channel: channel.kind,
+    })),
+  );
+}
+
+async function deliverReplies(input: {
+  tenant: Tenant;
+  to: string;
+  conversation: Conversation;
+  replies: ProcessResult["replies"];
+  channel: MessagingChannel;
+}) {
+  for (const reply of input.replies) {
+    await input.channel.sendText({
+      tenant: input.tenant,
+      to: input.to,
+      body: reply.body,
+      type: reply.type,
+    });
+    await addMessage({
+      conversationId: input.conversation.id,
+      tenantId: input.tenant.id,
+      direction: "outbound",
+      body: reply.body,
+      type: reply.type ?? "text",
+      processKey: reply.processKey,
+    });
+  }
+}
+
 export async function handleInboundMessage(input: {
   tenant: Tenant;
+  /** External customer id on the active channel (WhatsApp phone today). */
   customerWaId: string;
   customerName?: string;
   text: string;
@@ -197,8 +266,10 @@ export async function handleInboundMessage(input: {
   result: ProcessResult;
 }> {
   if (input.tenant.whatsapp.connected !== true) {
-    throw new Error("WhatsApp not connected");
+    throw new Error("Channel not connected");
   }
+
+  const channel = resolveChannel(input.tenant);
 
   let conversation = await getOrCreateConversation({
     tenantId: input.tenant.id,
@@ -216,10 +287,13 @@ export async function handleInboundMessage(input: {
   });
 
   if (conversation.status === "human_takeover") {
-    return {
-      conversation,
-      result: { handled: true, replies: [], events: ["human.takeover.active"] },
+    const result: ProcessResult = {
+      handled: true,
+      replies: [],
+      events: ["human.takeover.active"],
     };
+    await persistEvents(input.tenant, conversation, result.events, channel);
+    return { conversation, result };
   }
 
   const result = runActiveProcess(input.tenant, conversation, input.text);
@@ -231,21 +305,15 @@ export async function handleInboundMessage(input: {
     );
   }
 
-  for (const reply of result.replies) {
-    await sendWhatsAppText({
-      tenant: input.tenant,
-      to: input.customerWaId,
-      body: reply.body,
-    });
-    await addMessage({
-      conversationId: conversation.id,
-      tenantId: input.tenant.id,
-      direction: "outbound",
-      body: reply.body,
-      type: reply.type ?? "text",
-      processKey: reply.processKey,
-    });
-  }
+  await deliverReplies({
+    tenant: input.tenant,
+    to: input.customerWaId,
+    conversation,
+    replies: result.replies,
+    channel,
+  });
+
+  await persistEvents(input.tenant, conversation, result.events, channel);
 
   return { conversation, result };
 }
@@ -258,29 +326,27 @@ export async function triggerReminder(input: {
   if (!enabled(input.tenant, "reminders")) {
     return { skipped: true as const };
   }
+  const channel = resolveChannel(input.tenant);
   const result = buildReminderMessages(
     input.tenant,
     input.conversation,
     input.kind,
   );
+  let conversation = input.conversation;
   if (result.conversationPatch) {
-    await updateConversation(input.conversation.id, result.conversationPatch);
+    conversation = await updateConversation(
+      input.conversation.id,
+      result.conversationPatch,
+    );
   }
-  for (const reply of result.replies) {
-    await sendWhatsAppText({
-      tenant: input.tenant,
-      to: input.conversation.customerWaId,
-      body: reply.body,
-    });
-    await addMessage({
-      conversationId: input.conversation.id,
-      tenantId: input.tenant.id,
-      direction: "outbound",
-      body: reply.body,
-      type: "template",
-      processKey: "reminders",
-    });
-  }
+  await deliverReplies({
+    tenant: input.tenant,
+    to: input.conversation.customerWaId,
+    conversation,
+    replies: result.replies,
+    channel,
+  });
+  await persistEvents(input.tenant, conversation, result.events, channel);
   return { skipped: false as const, result };
 }
 
@@ -289,28 +355,26 @@ export async function triggerRetention(input: {
   conversation: Conversation;
 }) {
   if (!enabled(input.tenant, "retention")) return { skipped: true as const };
+  const channel = resolveChannel(input.tenant);
   const result = handleRetention({
     tenant: input.tenant,
     conversation: input.conversation,
     inboundText: "",
   });
+  let conversation = input.conversation;
   if (result.conversationPatch) {
-    await updateConversation(input.conversation.id, result.conversationPatch);
+    conversation = await updateConversation(
+      input.conversation.id,
+      result.conversationPatch,
+    );
   }
-  for (const reply of result.replies) {
-    await sendWhatsAppText({
-      tenant: input.tenant,
-      to: input.conversation.customerWaId,
-      body: reply.body,
-    });
-    await addMessage({
-      conversationId: input.conversation.id,
-      tenantId: input.tenant.id,
-      direction: "outbound",
-      body: reply.body,
-      type: "template",
-      processKey: "retention",
-    });
-  }
+  await deliverReplies({
+    tenant: input.tenant,
+    to: input.conversation.customerWaId,
+    conversation,
+    replies: result.replies,
+    channel,
+  });
+  await persistEvents(input.tenant, conversation, result.events, channel);
   return { skipped: false as const, result };
 }

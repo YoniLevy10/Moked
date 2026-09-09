@@ -2,7 +2,7 @@
   "name": "moked",
   "version": "0.1.0",
   "private": true,
-  "description": "MOKED — WhatsApp process OS for Israeli independents",
+  "description": "MOKED — operational system that turns conversations into measurable business outcomes",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

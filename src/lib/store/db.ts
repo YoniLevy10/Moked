@@ -6,6 +6,7 @@ import {
   Tenant,
   VERTICALS,
 } from "@/lib/types";
+import { BusinessEvent } from "@/lib/outcomes";
 import {
   getSupabaseAdmin,
   isSupabaseAdminConfigured,
@@ -16,6 +17,7 @@ export type DbShape = {
   tenants: Tenant[];
   conversations: Conversation[];
   messages: Message[];
+  businessEvents: BusinessEvent[];
   activeTenantId: string | null;
 };
 
@@ -95,6 +97,16 @@ type MessageRow = {
   type: Message["type"];
   process_key: ProcessKey | null;
   meta_message_id: string | null;
+  created_at: string;
+};
+
+type BusinessEventRow = {
+  id: string;
+  tenant_id: string;
+  conversation_id: string | null;
+  event_type: string;
+  payload: Record<string, unknown>;
+  channel: string;
   created_at: string;
 };
 
@@ -233,6 +245,18 @@ function mapMessage(row: MessageRow): Message {
   };
 }
 
+function mapBusinessEvent(row: BusinessEventRow): BusinessEvent {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    conversationId: row.conversation_id ?? undefined,
+    eventType: row.event_type,
+    payload: row.payload ?? {},
+    channel: row.channel ?? "whatsapp",
+    createdAt: row.created_at,
+  };
+}
+
 async function loadTenantBundle(tenantId: string): Promise<Tenant | null> {
   const sb = getSupabaseAdmin();
   const { data: row, error } = await sb
@@ -309,18 +333,39 @@ async function loadAllTenants(): Promise<Tenant[]> {
 export async function getDb(): Promise<DbShape> {
   if (!useRemote()) return fileStore.getDb();
   const sb = getSupabaseAdmin();
-  const [tenants, { data: convRows, error: cErr }, { data: msgRows, error: mErr }] =
-    await Promise.all([
-      loadAllTenants(),
-      sb.from("conversations").select("*").order("updated_at", { ascending: false }),
-      sb.from("messages").select("*").order("created_at", { ascending: true }),
-    ]);
+  const [
+    tenants,
+    { data: convRows, error: cErr },
+    { data: msgRows, error: mErr },
+    eventsRes,
+  ] = await Promise.all([
+    loadAllTenants(),
+    sb.from("conversations").select("*").order("updated_at", { ascending: false }),
+    sb.from("messages").select("*").order("created_at", { ascending: true }),
+    sb
+      .from("business_events")
+      .select("*")
+      .order("created_at", { ascending: false }),
+  ]);
   if (cErr) throw cErr;
   if (mErr) throw mErr;
+  let businessEvents: BusinessEvent[] = [];
+  if (eventsRes.error) {
+    if (
+      !/business_events|relation|does not exist/i.test(eventsRes.error.message)
+    ) {
+      throw eventsRes.error;
+    }
+  } else {
+    businessEvents = ((eventsRes.data ?? []) as BusinessEventRow[]).map(
+      mapBusinessEvent,
+    );
+  }
   return {
     tenants,
     conversations: ((convRows ?? []) as ConversationRow[]).map(mapConversation),
     messages: ((msgRows ?? []) as MessageRow[]).map(mapMessage),
+    businessEvents,
     activeTenantId: tenants[0]?.id ?? null,
   };
 }
@@ -691,6 +736,53 @@ export async function listMessages(conversationId: string): Promise<Message[]> {
     .order("created_at", { ascending: true });
   if (error) throw error;
   return ((data ?? []) as MessageRow[]).map(mapMessage);
+}
+
+export async function addBusinessEvents(
+  events: Array<Omit<BusinessEvent, "id" | "createdAt">>,
+): Promise<BusinessEvent[]> {
+  if (events.length === 0) return [];
+  if (!useRemote()) return fileStore.addBusinessEvents(events);
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("business_events")
+    .insert(
+      events.map((e) => ({
+        tenant_id: e.tenantId,
+        conversation_id: e.conversationId ?? null,
+        event_type: e.eventType,
+        payload: e.payload ?? {},
+        channel: e.channel ?? "whatsapp",
+      })),
+    )
+    .select("*");
+  if (error) {
+    // Table may not be migrated yet — fall back to file store so outcomes still work locally.
+    if (/business_events|relation|does not exist/i.test(error.message)) {
+      return fileStore.addBusinessEvents(events);
+    }
+    throw error;
+  }
+  return ((data ?? []) as BusinessEventRow[]).map(mapBusinessEvent);
+}
+
+export async function listBusinessEvents(
+  tenantId: string,
+): Promise<BusinessEvent[]> {
+  if (!useRemote()) return fileStore.listBusinessEvents(tenantId);
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("business_events")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .order("created_at", { ascending: false });
+  if (error) {
+    if (/business_events|relation|does not exist/i.test(error.message)) {
+      return fileStore.listBusinessEvents(tenantId);
+    }
+    throw error;
+  }
+  return ((data ?? []) as BusinessEventRow[]).map(mapBusinessEvent);
 }
 
 export function greetingFor(tenant: Tenant): string {

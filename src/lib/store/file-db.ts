@@ -9,6 +9,7 @@ import {
   Tenant,
   VERTICALS,
 } from "@/lib/types";
+import { BusinessEvent } from "@/lib/outcomes";
 
 const DATA_DIR = path.join(process.cwd(), ".data");
 const DB_FILE = path.join(DATA_DIR, "db.json");
@@ -17,6 +18,7 @@ export type DbShape = {
   tenants: Tenant[];
   conversations: Conversation[];
   messages: Message[];
+  businessEvents: BusinessEvent[];
   activeTenantId: string | null;
 };
 
@@ -37,6 +39,7 @@ function emptyDb(): DbShape {
     tenants: [],
     conversations: [],
     messages: [],
+    businessEvents: [],
     activeTenantId: null,
   };
 }
@@ -45,7 +48,12 @@ async function ensureDb(): Promise<DbShape> {
   await fs.mkdir(DATA_DIR, { recursive: true });
   try {
     const raw = await fs.readFile(DB_FILE, "utf8");
-    return JSON.parse(raw) as DbShape;
+    const parsed = JSON.parse(raw) as Partial<DbShape>;
+    return {
+      ...emptyDb(),
+      ...parsed,
+      businessEvents: parsed.businessEvents ?? [],
+    };
   } catch {
     const db = emptyDb();
     await fs.writeFile(DB_FILE, JSON.stringify(db, null, 2));
@@ -281,6 +289,31 @@ export async function listMessages(conversationId: string): Promise<Message[]> {
   return db.messages
     .filter((m) => m.conversationId === conversationId)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+export async function addBusinessEvents(
+  events: Array<Omit<BusinessEvent, "id" | "createdAt">>,
+): Promise<BusinessEvent[]> {
+  if (events.length === 0) return [];
+  const db = await ensureDb();
+  const now = new Date().toISOString();
+  const created: BusinessEvent[] = events.map((e) => ({
+    ...e,
+    id: nanoid(),
+    createdAt: now,
+  }));
+  db.businessEvents.push(...created);
+  await writeDb(db);
+  return created;
+}
+
+export async function listBusinessEvents(
+  tenantId: string,
+): Promise<BusinessEvent[]> {
+  const db = await ensureDb();
+  return db.businessEvents
+    .filter((e) => e.tenantId === tenantId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export function greetingFor(tenant: Tenant): string {

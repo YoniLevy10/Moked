@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  addBusinessEvents,
   addMessage,
   getConversationById,
   getTenantById,
@@ -36,20 +37,41 @@ export async function POST(req: NextRequest) {
     await updateConversation(conversation.id, {
       payment: { ...conversation.payment, status: "failed" },
     });
+    await addBusinessEvents([
+      {
+        tenantId: tenant.id,
+        conversationId: conversation.id,
+        eventType: "payment.failed",
+        payload: {},
+        channel: "whatsapp",
+      },
+    ]);
     return NextResponse.json({ ok: true, event: "payment.failed" });
   }
+
+  const amountIls = body.amountIls ?? conversation.quote?.amountIls ?? 0;
 
   await updateConversation(conversation.id, {
     payment: { ...conversation.payment, status: "paid" },
     activeProcess: undefined,
   });
 
+  await addBusinessEvents([
+    {
+      tenantId: tenant.id,
+      conversationId: conversation.id,
+      eventType: "payment.paid",
+      payload: { amountIls },
+      channel: "whatsapp",
+    },
+  ]);
+
   let invoice: { draftId: string; status: "draft" } | null = null;
   if (tenant.integrations.invoicingProvider !== "none") {
     invoice = createInvoiceDraft({
       provider: tenant.integrations.invoicingProvider,
       customerName: conversation.customerName ?? conversation.customerWaId,
-      amountIls: body.amountIls ?? conversation.quote?.amountIls ?? 0,
+      amountIls,
     });
   }
 
