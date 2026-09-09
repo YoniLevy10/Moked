@@ -25,7 +25,7 @@
 | נחיתה `/` | כולם | דמו שיווקי + CTAs להתחברות |
 | Onboarding | בעל עסק מחובר | הקמת עסק + חיבור WhatsApp (Meta / דמו) |
 | Dashboard | בעל עסק / superadmin על טננט פעיל | תוצאות עסקיות, תהליכים, חיבורים |
-| Superadmin | `ADMIN_EMAILS` בלבד | יצירת לקוחות + חשבון בעלים + מעבר לדשבורד |
+| Superadmin | `ADMIN_EMAILS` בלבד | יצירת לקוחות + **מנוע לידים לוולידציה** (`/superadmin/prospects`) |
 
 ---
 
@@ -52,9 +52,11 @@
 | **Postgres (Supabase)** | `pgsmselyieizacwdsdjl` | ✅ סכמה + חיבור קוד |
 | **Business events + Outcomes** | `/api/outcomes` | ✅ אירועים מתמשכים + KPI בדשבורד |
 | Channel adapter | `src/lib/channels` | ✅ מנוע לא תלוי ישירות ב־Meta |
+| **מנוע לידים (פנימי)** | `/superadmin/prospects` | ✅ רשימה + wa.me + משפך עניין לוולידציה |
 
 DB: כשיש `SUPABASE_SERVICE_ROLE_KEY` האפליקציה כותבת ל־Supabase במקום `.data/db.json`.
-מיגרציית אירועים: `supabase/migrations/20260908225400_business_events.sql` (להריץ על הפרויקט אם עדיין לא).
+מיגרציית אירועים: `supabase/migrations/20260908225400_business_events.sql`
+מיגרציית לידים: `supabase/migrations/20260909095800_prospects.sql`
 
 ---
 

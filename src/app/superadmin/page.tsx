@@ -147,11 +147,20 @@ export default function SuperadminPage() {
           <h1 className="display text-3xl font-bold">Onboarding לקוחות</h1>
           {me && (
             <p className="mt-1 text-sm text-muted">
-              {me.name} · {me.email}
+              {me.name} · {me.email} ·{" "}
+              <Link href="/superadmin/prospects" className="text-brand underline">
+                וולידציה / לידים
+              </Link>
             </p>
           )}
         </div>
         <div className="flex gap-2">
+          <Link
+            href="/superadmin/prospects"
+            className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white"
+          >
+            מנוע לידים
+          </Link>
           <Link
             href="/dashboard"
             className="rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold"
