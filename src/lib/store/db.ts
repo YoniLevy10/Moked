@@ -333,18 +333,39 @@ async function loadAllTenants(): Promise<Tenant[]> {
 export async function getDb(): Promise<DbShape> {
   if (!useRemote()) return fileStore.getDb();
   const sb = getSupabaseAdmin();
-  const [tenants, { data: convRows, error: cErr }, { data: msgRows, error: mErr }] =
-    await Promise.all([
-      loadAllTenants(),
-      sb.from("conversations").select("*").order("updated_at", { ascending: false }),
-      sb.from("messages").select("*").order("created_at", { ascending: true }),
-    ]);
+  const [
+    tenants,
+    { data: convRows, error: cErr },
+    { data: msgRows, error: mErr },
+    eventsRes,
+  ] = await Promise.all([
+    loadAllTenants(),
+    sb.from("conversations").select("*").order("updated_at", { ascending: false }),
+    sb.from("messages").select("*").order("created_at", { ascending: true }),
+    sb
+      .from("business_events")
+      .select("*")
+      .order("created_at", { ascending: false }),
+  ]);
   if (cErr) throw cErr;
   if (mErr) throw mErr;
+  let businessEvents: BusinessEvent[] = [];
+  if (eventsRes.error) {
+    if (
+      !/business_events|relation|does not exist/i.test(eventsRes.error.message)
+    ) {
+      throw eventsRes.error;
+    }
+  } else {
+    businessEvents = ((eventsRes.data ?? []) as BusinessEventRow[]).map(
+      mapBusinessEvent,
+    );
+  }
   return {
     tenants,
     conversations: ((convRows ?? []) as ConversationRow[]).map(mapConversation),
     messages: ((msgRows ?? []) as MessageRow[]).map(mapMessage),
+    businessEvents,
     activeTenantId: tenants[0]?.id ?? null,
   };
 }
