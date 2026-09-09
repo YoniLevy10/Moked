@@ -10,6 +10,7 @@ import {
   VERTICALS,
 } from "@/lib/types";
 import { BusinessEvent } from "@/lib/outcomes";
+import { Prospect } from "@/lib/prospects";
 
 const DATA_DIR = path.join(process.cwd(), ".data");
 const DB_FILE = path.join(DATA_DIR, "db.json");
@@ -19,6 +20,7 @@ export type DbShape = {
   conversations: Conversation[];
   messages: Message[];
   businessEvents: BusinessEvent[];
+  prospects: Prospect[];
   activeTenantId: string | null;
 };
 
@@ -40,6 +42,7 @@ function emptyDb(): DbShape {
     conversations: [],
     messages: [],
     businessEvents: [],
+    prospects: [],
     activeTenantId: null,
   };
 }
@@ -53,6 +56,7 @@ async function ensureDb(): Promise<DbShape> {
       ...emptyDb(),
       ...parsed,
       businessEvents: parsed.businessEvents ?? [],
+      prospects: parsed.prospects ?? [],
     };
   } catch {
     const db = emptyDb();
@@ -314,6 +318,53 @@ export async function listBusinessEvents(
   return db.businessEvents
     .filter((e) => e.tenantId === tenantId)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export async function listProspects(): Promise<Prospect[]> {
+  const db = await ensureDb();
+  return [...db.prospects].sort((a, b) =>
+    b.updatedAt.localeCompare(a.updatedAt),
+  );
+}
+
+export async function createProspect(
+  input: Omit<Prospect, "id" | "createdAt" | "updatedAt">,
+): Promise<Prospect> {
+  const db = await ensureDb();
+  const now = new Date().toISOString();
+  const prospect: Prospect = {
+    ...input,
+    id: nanoid(),
+    createdAt: now,
+    updatedAt: now,
+  };
+  db.prospects.unshift(prospect);
+  await writeDb(db);
+  return prospect;
+}
+
+export async function updateProspect(
+  id: string,
+  patch: Partial<
+    Omit<Prospect, "id" | "createdAt" | "updatedAt">
+  >,
+): Promise<Prospect> {
+  const db = await ensureDb();
+  const idx = db.prospects.findIndex((p) => p.id === id);
+  if (idx < 0) throw new Error("Prospect not found");
+  db.prospects[idx] = {
+    ...db.prospects[idx],
+    ...patch,
+    updatedAt: new Date().toISOString(),
+  };
+  await writeDb(db);
+  return db.prospects[idx];
+}
+
+export async function deleteProspect(id: string): Promise<void> {
+  const db = await ensureDb();
+  db.prospects = db.prospects.filter((p) => p.id !== id);
+  await writeDb(db);
 }
 
 export function greetingFor(tenant: Tenant): string {

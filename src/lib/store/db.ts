@@ -7,6 +7,7 @@ import {
   VERTICALS,
 } from "@/lib/types";
 import { BusinessEvent } from "@/lib/outcomes";
+import { Prospect, ProspectStatus, ProspectVertical } from "@/lib/prospects";
 import {
   getSupabaseAdmin,
   isSupabaseAdminConfigured,
@@ -18,6 +19,7 @@ export type DbShape = {
   conversations: Conversation[];
   messages: Message[];
   businessEvents: BusinessEvent[];
+  prospects: Prospect[];
   activeTenantId: string | null;
 };
 
@@ -108,6 +110,22 @@ type BusinessEventRow = {
   payload: Record<string, unknown>;
   channel: string;
   created_at: string;
+};
+
+type ProspectRow = {
+  id: string;
+  business_name: string;
+  contact_name: string | null;
+  phone: string;
+  vertical: ProspectVertical;
+  source: string;
+  status: ProspectStatus;
+  notes: string;
+  last_outreach_at: string | null;
+  last_outreach_channel: Prospect["lastOutreachChannel"] | null;
+  interest_score: number | null;
+  created_at: string;
+  updated_at: string;
 };
 
 function useRemote(): boolean {
@@ -257,6 +275,24 @@ function mapBusinessEvent(row: BusinessEventRow): BusinessEvent {
   };
 }
 
+function mapProspect(row: ProspectRow): Prospect {
+  return {
+    id: row.id,
+    businessName: row.business_name,
+    contactName: row.contact_name ?? undefined,
+    phone: row.phone,
+    vertical: row.vertical,
+    source: row.source,
+    status: row.status,
+    notes: row.notes ?? "",
+    lastOutreachAt: row.last_outreach_at ?? undefined,
+    lastOutreachChannel: row.last_outreach_channel ?? undefined,
+    interestScore: row.interest_score ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 async function loadTenantBundle(tenantId: string): Promise<Tenant | null> {
   const sb = getSupabaseAdmin();
   const { data: row, error } = await sb
@@ -338,6 +374,7 @@ export async function getDb(): Promise<DbShape> {
     { data: convRows, error: cErr },
     { data: msgRows, error: mErr },
     eventsRes,
+    prospectsRes,
   ] = await Promise.all([
     loadAllTenants(),
     sb.from("conversations").select("*").order("updated_at", { ascending: false }),
@@ -346,6 +383,7 @@ export async function getDb(): Promise<DbShape> {
       .from("business_events")
       .select("*")
       .order("created_at", { ascending: false }),
+    sb.from("prospects").select("*").order("updated_at", { ascending: false }),
   ]);
   if (cErr) throw cErr;
   if (mErr) throw mErr;
@@ -361,11 +399,23 @@ export async function getDb(): Promise<DbShape> {
       mapBusinessEvent,
     );
   }
+  let prospects: Prospect[] = [];
+  if (prospectsRes.error) {
+    if (
+      !/prospects|relation|does not exist/i.test(prospectsRes.error.message)
+    ) {
+      throw prospectsRes.error;
+    }
+    prospects = await fileStore.listProspects();
+  } else {
+    prospects = ((prospectsRes.data ?? []) as ProspectRow[]).map(mapProspect);
+  }
   return {
     tenants,
     conversations: ((convRows ?? []) as ConversationRow[]).map(mapConversation),
     messages: ((msgRows ?? []) as MessageRow[]).map(mapMessage),
     businessEvents,
+    prospects,
     activeTenantId: tenants[0]?.id ?? null,
   };
 }
@@ -783,6 +833,102 @@ export async function listBusinessEvents(
     throw error;
   }
   return ((data ?? []) as BusinessEventRow[]).map(mapBusinessEvent);
+}
+
+export async function listProspects(): Promise<Prospect[]> {
+  if (!useRemote()) return fileStore.listProspects();
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("prospects")
+    .select("*")
+    .order("updated_at", { ascending: false });
+  if (error) {
+    if (/prospects|relation|does not exist/i.test(error.message)) {
+      return fileStore.listProspects();
+    }
+    throw error;
+  }
+  return ((data ?? []) as ProspectRow[]).map(mapProspect);
+}
+
+export async function createProspect(
+  input: Omit<Prospect, "id" | "createdAt" | "updatedAt">,
+): Promise<Prospect> {
+  if (!useRemote()) return fileStore.createProspect(input);
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("prospects")
+    .insert({
+      business_name: input.businessName,
+      contact_name: input.contactName ?? null,
+      phone: input.phone,
+      vertical: input.vertical,
+      source: input.source,
+      status: input.status,
+      notes: input.notes ?? "",
+      last_outreach_at: input.lastOutreachAt ?? null,
+      last_outreach_channel: input.lastOutreachChannel ?? null,
+      interest_score: input.interestScore ?? null,
+    })
+    .select("*")
+    .single();
+  if (error) {
+    if (/prospects|relation|does not exist/i.test(error.message)) {
+      return fileStore.createProspect(input);
+    }
+    throw error;
+  }
+  return mapProspect(data as ProspectRow);
+}
+
+export async function updateProspect(
+  id: string,
+  patch: Partial<Omit<Prospect, "id" | "createdAt" | "updatedAt">>,
+): Promise<Prospect> {
+  if (!useRemote()) return fileStore.updateProspect(id, patch);
+  const sb = getSupabaseAdmin();
+  const row: Record<string, unknown> = {};
+  if (patch.businessName !== undefined) row.business_name = patch.businessName;
+  if (patch.contactName !== undefined) row.contact_name = patch.contactName;
+  if (patch.phone !== undefined) row.phone = patch.phone;
+  if (patch.vertical !== undefined) row.vertical = patch.vertical;
+  if (patch.source !== undefined) row.source = patch.source;
+  if (patch.status !== undefined) row.status = patch.status;
+  if (patch.notes !== undefined) row.notes = patch.notes;
+  if (patch.lastOutreachAt !== undefined) {
+    row.last_outreach_at = patch.lastOutreachAt;
+  }
+  if (patch.lastOutreachChannel !== undefined) {
+    row.last_outreach_channel = patch.lastOutreachChannel;
+  }
+  if (patch.interestScore !== undefined) {
+    row.interest_score = patch.interestScore;
+  }
+  const { data, error } = await sb
+    .from("prospects")
+    .update(row)
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) {
+    if (/prospects|relation|does not exist/i.test(error.message)) {
+      return fileStore.updateProspect(id, patch);
+    }
+    throw error;
+  }
+  return mapProspect(data as ProspectRow);
+}
+
+export async function deleteProspect(id: string): Promise<void> {
+  if (!useRemote()) return fileStore.deleteProspect(id);
+  const sb = getSupabaseAdmin();
+  const { error } = await sb.from("prospects").delete().eq("id", id);
+  if (error) {
+    if (/prospects|relation|does not exist/i.test(error.message)) {
+      return fileStore.deleteProspect(id);
+    }
+    throw error;
+  }
 }
 
 export function greetingFor(tenant: Tenant): string {
