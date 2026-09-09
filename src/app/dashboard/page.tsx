@@ -341,21 +341,23 @@ export default function DashboardHome() {
       </section>
 
       <section className="rounded-3xl border border-line bg-white/70 p-6">
-        <button
-          type="button"
-          onClick={() => setShowLab((v) => !v)}
-          className="flex w-full items-center justify-between text-start"
-        >
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="display text-xl font-bold">מעבדת תהליכים</h2>
             <p className="mt-1 text-sm text-muted">
               סימולציה לפיתוח — לא מדד מוצר.
             </p>
           </div>
-          <span className="text-sm font-semibold text-brand">
-            {showLab ? "הסתר" : "הצג"}
-          </span>
-        </button>
+          <button
+            type="button"
+            id="toggle-process-lab"
+            aria-expanded={showLab}
+            onClick={() => setShowLab((v) => !v)}
+            className="rounded-full border border-brand px-4 py-2 text-sm font-semibold text-brand hover:bg-brand/5"
+          >
+            {showLab ? "הסתר מעבדה" : "הצג מעבדה"}
+          </button>
+        </div>
 
         {showLab && (
           <div className="mt-4">
