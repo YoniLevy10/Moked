@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Heebo, Rubik } from "next/font/google";
 import "./globals.css";
 
@@ -15,13 +15,30 @@ const rubik = Rubik({
 });
 
 export const metadata: Metadata = {
-  title: "MOKED — הוואטסאפ של העסק, רץ לבד",
+  title: "מוקד — מכל שיחה לתוצאה עסקית",
   description:
-    "חיבור WhatsApp בלחיצה לעצמאים בישראל. 7 תהליכים: קליטה, סינון, תורים, תזכורות, שימור, הצעות וגבייה.",
+    "מוקד הופכת שיחות WhatsApp לתהליך תפעולי מסודר: קליטת פניות, תיאום, תזכורות, הצעות מחיר ומעקב — במקום אחד.",
+  applicationName: "מוקד",
+  keywords: ["מוקד", "ניהול פניות", "מערכת תפעול לעסקים", "WhatsApp לעסקים"],
+  openGraph: {
+    type: "website",
+    locale: "he_IL",
+    siteName: "מוקד",
+    title: "מוקד — מכל שיחה לתוצאה עסקית",
+    description:
+      "מערכת תפעול עסקית שמחברת שיחות WhatsApp לפניות, תיאומים והמשך טיפול.",
+  },
   icons: {
     icon: "/favicon.png",
     apple: "/apple-touch-icon.png",
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#087a55",
+  colorScheme: "light",
 };
 
 export default function RootLayout({
@@ -33,7 +50,7 @@ export default function RootLayout({
       dir="rtl"
       className={`${heebo.variable} ${rubik.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col grain">{children}</body>
+      <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
 }

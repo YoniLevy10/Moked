@@ -1,5 +1,5 @@
-import { LandingGate } from "@/components/landing/LandingGate";
+import { MokedLandingPage } from "@/components/landing/MokedLandingPage";
 
 export default function HomePage() {
-  return <LandingGate />;
+  return <MokedLandingPage />;
 }
