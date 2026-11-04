@@ -1,0 +1,21 @@
+{
+  "title": "Moked",
+  "description": "Operations desk for independent businesses in Israel. Turns inbound conversations into leads, bookings, reminders, and retention, with WhatsApp as the channel.",
+  "status": "Development",
+  "visibility": true,
+  "featured": false,
+  "category": "Automation",
+  "website": "https://moked-ten.vercel.app",
+  "logo": "",
+  "cover": "",
+  "video": "",
+  "technologies": [
+    "Next.js",
+    "TypeScript",
+    "Supabase"
+  ],
+  "tags": [
+    "whatsapp",
+    "bookings"
+  ]
+}
