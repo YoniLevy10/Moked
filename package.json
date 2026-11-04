@@ -13,6 +13,7 @@
     "smoke:wave-a": "node scripts/smoke-wave-a.mjs"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.2.0",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.3",
     "nanoid": "^6.0.1",

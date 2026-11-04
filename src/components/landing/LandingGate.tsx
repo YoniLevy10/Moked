@@ -127,6 +127,8 @@ export function LandingGate() {
       </header>
 
       <main className="hero">
+        <div className="demo-grid">
+        <div className="demo-copy">
         <p className="eyebrow">אוטומטי בשגרה · אנושי בהחלטות</p>
         <h1>
           מוקד — העסק שלך עובד
@@ -138,6 +140,7 @@ export function LandingGate() {
             ? "שכבת תפעול בוואטסאפ: פנייה שלא נענתה הופכת לביקור ביומן."
             : `כך זה נראה אצל ${biz} ב${visitor.field}: שיחה שלא נענתה → מענה → שיבוץ.`}
         </p>
+        </div>
 
         <section className="chat" aria-label="דמו שיחה">
           <div className="bubble sys">
@@ -155,7 +158,7 @@ export function LandingGate() {
 
         <div className="actions">
           <Link className="cta" href="/login?next=/onboarding">
-            חברו את העסק למערכת
+            פותחים מנוי — 249 ₪ לחודש
           </Link>
           <a
             className="cta secondary"
@@ -168,12 +171,10 @@ export function LandingGate() {
           <Link className="cta secondary" href="/login?next=/dashboard">
             כניסת בעל עסק לדשבורד
           </Link>
-          <Link className="cta secondary" href="/login?next=/superadmin">
-            כניסת Superadmin
-          </Link>
           <button type="button" className="skip" onClick={() => setVisitor(null)}>
             חזרה לשער
           </button>
+        </div>
         </div>
       </main>
     </div>

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { SuperadminShell } from "@/components/superadmin/SuperadminShell";
 import { getSessionUser } from "@/lib/auth/session";
 
 export default async function SuperadminLayout({
@@ -9,5 +10,5 @@ export default async function SuperadminLayout({
   const user = await getSessionUser();
   if (!user) redirect("/login?next=/superadmin");
   if (user.role !== "superadmin") redirect("/dashboard");
-  return children;
+  return <SuperadminShell name={user.name}>{children}</SuperadminShell>;
 }

@@ -22,10 +22,12 @@ export default function LoginPage() {
     fetch("/api/auth")
       .then((r) => r.json())
       .then((d) => {
-        if (d.user) router.replace(next);
+        if (d.user) {
+          router.replace(d.user.role === "superadmin" ? "/superadmin" : next);
+        }
         if (d.mode === "local") {
           setInfo(
-            "מצב מקומי (בלי Supabase). Superadmin: המייל ב־ADMIN_EMAILS + סיסמת bootstrap.",
+            "מצב מקומי לפיתוח.",
           );
         }
       })
@@ -49,11 +51,7 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "שגיאת התחברות");
-      const dest =
-        data.user?.role === "superadmin" &&
-        (next === "/dashboard" || !params.get("next"))
-          ? "/superadmin"
-          : next;
+      const dest = data.user?.role === "superadmin" ? "/superadmin" : next;
       router.replace(dest);
     } catch (err) {
       setError(err instanceof Error ? err.message : "שגיאה");
@@ -69,7 +67,7 @@ export default function LoginPage() {
       </Link>
       <h1 className="display text-3xl font-bold">כניסה במייל</h1>
       <p className="mt-2 text-sm text-muted">
-        כמו ב־Fixly / OpsBrain — מייל + סיסמה. עם Supabase כשמוגדר, אחרת אחסון מקומי לפיתוח.
+        כמו ב־Fixly / OpsBrain — מייל וסיסמה.
       </p>
 
       <div className="mt-6 flex gap-2">

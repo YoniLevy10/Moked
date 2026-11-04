@@ -2,8 +2,12 @@ import {
   addBusinessEvents,
   addMessage,
   getOrCreateConversation,
+  listPhoneNumbers,
   updateConversation,
+  updateTenant,
 } from "@/lib/store/db";
+import { replyFromInstructions, outboundPeriod } from "@/lib/product/bot";
+import { currentPeriod } from "@/lib/product/model";
 import { Conversation, ProcessKey, Tenant } from "@/lib/types";
 import { handleIntake } from "@/lib/processes/waves/intake";
 import { handleQualification } from "@/lib/processes/waves/qualification";
@@ -296,7 +300,69 @@ export async function handleInboundMessage(input: {
     return { conversation, result };
   }
 
-  const result = runActiveProcess(input.tenant, conversation, input.text);
+  const silenced =
+    input.tenant.subscription.status === "canceled" ||
+    input.tenant.subscription.status === "past_due";
+  if (silenced) {
+    const result: ProcessResult = {
+      handled: true,
+      replies: [],
+      events: ["subscription.inactive"],
+    };
+    await persistEvents(input.tenant, conversation, result.events, channel);
+    return { conversation, result };
+  }
+
+  const numbers = await listPhoneNumbers();
+  const liveNumber = numbers.find(
+    (phone) => phone.tenantId === input.tenant.id && phone.status === "live",
+  );
+  const useInstructions =
+    input.tenant.subscription.status === "active" &&
+    Boolean(input.tenant.bot.approved) &&
+    Boolean(liveNumber);
+
+  let result: ProcessResult;
+  if (useInstructions) {
+    const room = outboundPeriod(input.tenant);
+    if (room.blocked) {
+      result = { handled: true, replies: [], events: ["bot.cap_reached"] };
+    } else {
+      const decision = await replyFromInstructions(input.tenant, input.text);
+      const alreadyLead = Boolean(conversation.processState.leadRecorded);
+      const events = [
+        decision.lead && !alreadyLead ? "lead.created" : "",
+        decision.booking && !conversation.booking?.confirmedAt ? "booking.confirmed" : "",
+      ].filter(Boolean);
+      result = {
+        handled: true,
+        replies: [{ body: decision.reply, processKey: "intake" }],
+        events,
+        conversationPatch: {
+          processState: {
+            ...conversation.processState,
+            leadRecorded: alreadyLead || decision.lead,
+          },
+          ...(decision.booking
+            ? { booking: { confirmedAt: new Date().toISOString() } }
+            : {}),
+        },
+      };
+      const period = currentPeriod();
+      const count = (input.tenant.subscription.outboundPeriod === period
+        ? input.tenant.subscription.outboundCount
+        : 0) + 1;
+      await updateTenant(input.tenant.id, {
+        subscription: {
+          ...input.tenant.subscription,
+          outboundPeriod: period,
+          outboundCount: count,
+        },
+      });
+    }
+  } else {
+    result = runActiveProcess(input.tenant, conversation, input.text);
+  }
 
   if (result.conversationPatch) {
     conversation = await updateConversation(

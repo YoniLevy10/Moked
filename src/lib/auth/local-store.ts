@@ -3,12 +3,23 @@ import {
   isAdminEmail,
   normalizeEmail,
 } from "@/lib/auth/shared";
+import { hasNeon } from "@/lib/db/remote";
 import {
   getSupabaseAdmin,
   getSupabaseAnon,
   isSupabaseAdminConfigured,
 } from "@/lib/supabase/server";
 import * as fileAuth from "@/lib/auth/file-auth";
+import {
+  ensureNeonBootstrapAdmin,
+  neonAuthenticate,
+  neonGetUserByEmail,
+  neonGetUserById,
+  neonLinkUserToTenant,
+  neonListUsers,
+  neonRegisterOwner,
+  neonUpsertUser,
+} from "@/lib/auth/neon-auth";
 
 type ProfileRow = {
   id: string;
@@ -21,6 +32,10 @@ type ProfileRow = {
 
 function useRemote(): boolean {
   return isSupabaseAdminConfigured();
+}
+
+function useNeon(): boolean {
+  return hasNeon();
 }
 
 function mapProfile(row: ProfileRow): AuthUser {
@@ -99,6 +114,7 @@ async function ensureProfile(input: {
 
 /** Ensures bootstrap superadmin exists when ADMIN_EMAILS is set. */
 export async function ensureBootstrapAdmin(): Promise<void> {
+  if (useNeon()) return ensureNeonBootstrapAdmin();
   if (!useRemote()) return fileAuth.ensureBootstrapAdmin();
 
   const email = process.env.ADMIN_EMAILS?.split(",")[0]?.trim();
@@ -155,6 +171,7 @@ export async function registerOwner(input: {
   name: string;
   tenantId?: string;
 }): Promise<AuthUser> {
+  if (useNeon()) return neonRegisterOwner(input);
   if (!useRemote()) return fileAuth.registerOwner(input);
 
   const email = normalizeEmail(input.email);
@@ -185,6 +202,7 @@ export async function authenticateLocal(
   email: string,
   password: string,
 ): Promise<AuthUser | null> {
+  if (useNeon()) return neonAuthenticate(email, password);
   if (!useRemote()) return fileAuth.authenticateLocal(email, password);
 
   await ensureBootstrapAdmin();
@@ -211,12 +229,14 @@ export async function authenticateLocal(
 }
 
 export async function getUserById(id: string): Promise<AuthUser | null> {
+  if (useNeon()) return neonGetUserById(id);
   if (!useRemote()) return fileAuth.getUserById(id);
   await ensureBootstrapAdmin();
   return getProfileById(id);
 }
 
 export async function getUserByEmail(email: string): Promise<AuthUser | null> {
+  if (useNeon()) return neonGetUserByEmail(email);
   if (!useRemote()) return fileAuth.getUserByEmail(email);
   await ensureBootstrapAdmin();
   return getProfileByEmail(email);
@@ -230,11 +250,13 @@ export async function upsertExternalUser(input: {
   role?: AuthUser["role"];
   tenantId?: string;
 }): Promise<AuthUser> {
+  if (useNeon()) return neonUpsertUser(input);
   if (!useRemote()) return fileAuth.upsertExternalUser(input);
   return ensureProfile(input);
 }
 
 export async function listUsers(): Promise<AuthUser[]> {
+  if (useNeon()) return neonListUsers();
   if (!useRemote()) return fileAuth.listUsers();
   await ensureBootstrapAdmin();
   const sb = getSupabaseAdmin();
@@ -250,6 +272,7 @@ export async function linkUserToTenant(
   userId: string,
   tenantId: string,
 ): Promise<AuthUser> {
+  if (useNeon()) return neonLinkUserToTenant(userId, tenantId);
   if (!useRemote()) return fileAuth.linkUserToTenant(userId, tenantId);
   const sb = getSupabaseAdmin();
   const { error } = await sb

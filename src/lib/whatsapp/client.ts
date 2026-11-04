@@ -7,6 +7,13 @@ export function getWhatsAppToken(tenant: Tenant): string | null {
   if (tenant.whatsapp.mode === "live" && tenant.whatsapp.accessToken) {
     return tenant.whatsapp.accessToken;
   }
+  if (
+    tenant.whatsapp.wabaId &&
+    tenant.whatsapp.wabaId === process.env.META_WABA_ID &&
+    process.env.META_SYSTEM_USER_TOKEN
+  ) {
+    return process.env.META_SYSTEM_USER_TOKEN;
+  }
   return process.env.META_WHATSAPP_TOKEN ?? null;
 }
 

@@ -115,7 +115,6 @@ export default function SuperadminPage() {
       return;
     }
     setActiveTenantId(tenantId);
-    router.push("/dashboard");
   }
 
   async function logout() {
@@ -132,8 +131,8 @@ export default function SuperadminPage() {
       <main className="mx-auto w-full max-w-lg px-4 py-16 text-center">
         <h1 className="display text-2xl font-bold">אין הרשאה</h1>
         <p className="mt-2 text-muted">{error}</p>
-        <Link href="/dashboard" className="mt-6 inline-block text-brand underline">
-          חזרה לדשבורד
+        <Link href="/superadmin" className="mt-6 inline-block text-brand underline">
+          חזרה ללקוחות
         </Link>
       </main>
     );
@@ -162,16 +161,10 @@ export default function SuperadminPage() {
             מנוע לידים
           </Link>
           <Link
-            href="/dashboard"
+            href="/superadmin/numbers"
             className="rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold"
           >
-            לדשבורד פעיל
-          </Link>
-          <Link
-            href="/"
-            className="rounded-full border border-line bg-white px-4 py-2 text-sm"
-          >
-            נחיתה
+            מאגר מספרים
           </Link>
           <button
             type="button"
@@ -199,8 +192,7 @@ export default function SuperadminPage() {
         className="grid gap-3 rounded-3xl border border-line bg-white/80 p-6 md:grid-cols-2"
       >
         <p className="md:col-span-2 text-sm text-muted">
-          יצירת עסק + חשבון בעלים. לאחר מכן בעל העסק מתחבר ב־/login ומחבר Meta
-          ב־חיבורים, או שתפתחו את הדשבורד שלו מכאן.
+          יצירת עסק + חשבון בעלים. בעל העסק מתחבר ומפעיל את המנוי ואת הוראות הבוט.
         </p>
         <label className="text-sm md:col-span-2">
           שם העסק
@@ -320,7 +312,7 @@ export default function SuperadminPage() {
                 onClick={() => void openDashboard(t.id)}
                 className="text-sm font-semibold text-brand underline"
               >
-                פתח דשבורד
+                סמן כלקוח פעיל
               </button>
             </div>
           ))}

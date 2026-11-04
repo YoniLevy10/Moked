@@ -249,6 +249,10 @@ export default function DashboardHome() {
           ) : (
             <span className="font-semibold text-danger">לא מחובר</span>
           )}
+          {" · "}
+          <Link href="/dashboard/bot" className="font-semibold text-brand underline">
+            המנוי והבוט
+          </Link>
         </p>
         <p className="mt-1 max-w-2xl text-sm text-muted">
           לא כמה הודעות נשלחו — כמה לידים נסגרו, תורים נקבעו, הכנסות נוצרו

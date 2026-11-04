@@ -1,17 +1,18 @@
 import {
+  BotAnswers,
   Conversation,
   Message,
+  PhoneNumber,
   PROCESS_CATALOG,
   ProcessKey,
+  Subscription,
   Tenant,
   VERTICALS,
 } from "@/lib/types";
+import { defaultBot, defaultSubscription } from "@/lib/product/model";
 import { BusinessEvent } from "@/lib/outcomes";
 import { Prospect, ProspectStatus, ProspectVertical } from "@/lib/prospects";
-import {
-  getSupabaseAdmin,
-  isSupabaseAdminConfigured,
-} from "@/lib/supabase/server";
+import { getRemote, hasRemoteDb } from "@/lib/db/remote";
 import * as fileStore from "@/lib/store/file-db";
 
 export type DbShape = {
@@ -41,6 +42,18 @@ type TenantRow = {
   invoicing_provider: Tenant["integrations"]["invoicingProvider"];
   google_reviews_url: string | null;
   created_at: string;
+  subscription_status?: Subscription["status"] | null;
+  subscription_renews_at?: string | null;
+  subscription_provider?: string | null;
+  subscription_external_id?: string | null;
+  subscription_invoice_id?: string | null;
+  monthly_outbound_cap?: number | null;
+  outbound_count?: number | null;
+  outbound_period?: string | null;
+  bot_draft?: string | null;
+  bot_answers?: Partial<BotAnswers> | null;
+  bot_approved?: string | null;
+  bot_approved_at?: string | null;
 };
 
 type ProcessRow = {
@@ -129,7 +142,11 @@ type ProspectRow = {
 };
 
 function useRemote(): boolean {
-  return isSupabaseAdminConfigured();
+  return hasRemoteDb();
+}
+
+function getSupabaseAdmin(): { from: (table: string) => any } {
+  return getRemote() as { from: (table: string) => any };
 }
 
 function defaultProcesses(): Tenant["processes"] {
@@ -187,6 +204,27 @@ function mapTenant(
       priceIls: Number(p.price_ils),
       description: p.description ?? undefined,
     })),
+    subscription: {
+      ...defaultSubscription(),
+      status: row.subscription_status ?? "inactive",
+      renewsAt: row.subscription_renews_at ?? undefined,
+      provider: row.subscription_provider ?? undefined,
+      externalId: row.subscription_external_id ?? undefined,
+      invoiceId: row.subscription_invoice_id ?? undefined,
+      monthlyOutboundCap: row.monthly_outbound_cap ?? 1000,
+      outboundCount: row.outbound_count ?? 0,
+      outboundPeriod: row.outbound_period ?? undefined,
+    },
+    bot: {
+      ...defaultBot(),
+      draft: row.bot_draft ?? "",
+      answers: {
+        ...defaultBot().answers,
+        ...(row.bot_answers ?? {}),
+      },
+      approved: row.bot_approved ?? undefined,
+      approvedAt: row.bot_approved_at ?? undefined,
+    },
   };
 }
 
@@ -331,7 +369,7 @@ async function loadAllTenants(): Promise<Tenant[]> {
   if (error) throw error;
   if (!rows?.length) return [];
 
-  const ids = rows.map((r) => r.id as string);
+  const ids = (rows as Array<{ id: string }>).map((r) => r.id);
   const [{ data: processes }, { data: pricing }, { data: secrets }] =
     await Promise.all([
       sb.from("tenant_processes").select("*").in("tenant_id", ids),
@@ -522,6 +560,19 @@ export async function updateTenant(
     ? { ...current.integrations, ...patch.integrations }
     : current.integrations;
 
+  const subscription = patch.subscription
+    ? { ...current.subscription, ...patch.subscription }
+    : current.subscription;
+  const bot = patch.bot
+    ? {
+        ...current.bot,
+        ...patch.bot,
+        answers: patch.bot.answers
+          ? { ...current.bot.answers, ...patch.bot.answers }
+          : current.bot.answers,
+      }
+    : current.bot;
+
   const { error } = await sb
     .from("tenants")
     .update({
@@ -539,6 +590,18 @@ export async function updateTenant(
       payments_provider: integrations.paymentsProvider,
       invoicing_provider: integrations.invoicingProvider,
       google_reviews_url: integrations.googleReviewsUrl ?? null,
+      subscription_status: subscription.status,
+      subscription_renews_at: subscription.renewsAt ?? null,
+      subscription_provider: subscription.provider ?? null,
+      subscription_external_id: subscription.externalId ?? null,
+      subscription_invoice_id: subscription.invoiceId ?? null,
+      monthly_outbound_cap: subscription.monthlyOutboundCap,
+      outbound_count: subscription.outboundCount,
+      outbound_period: subscription.outboundPeriod ?? null,
+      bot_draft: bot.draft,
+      bot_answers: bot.answers,
+      bot_approved: bot.approved ?? null,
+      bot_approved_at: bot.approvedAt ?? null,
     })
     .eq("id", tenantId);
   if (error) throw error;
@@ -929,6 +992,107 @@ export async function deleteProspect(id: string): Promise<void> {
     }
     throw error;
   }
+}
+
+type PhoneRow = {
+  id: string;
+  e164: string;
+  national: string;
+  kind: PhoneNumber["kind"];
+  status: PhoneNumber["status"];
+  tenant_id: string | null;
+  phone_number_id: string | null;
+  display_name: string | null;
+  pin_cipher: string | null;
+  last_error: string | null;
+  last_code: string | null;
+  cooldown_until: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+function mapPhone(row: PhoneRow): PhoneNumber {
+  return {
+    id: row.id,
+    e164: row.e164,
+    national: row.national,
+    kind: row.kind,
+    status: row.status,
+    tenantId: row.tenant_id ?? undefined,
+    phoneNumberId: row.phone_number_id ?? undefined,
+    displayName: row.display_name ?? undefined,
+    pinCipher: row.pin_cipher ?? undefined,
+    lastError: row.last_error ?? undefined,
+    lastCode: row.last_code ?? undefined,
+    cooldownUntil: row.cooldown_until ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export async function listPhoneNumbers(): Promise<PhoneNumber[]> {
+  if (!useRemote()) return fileStore.listPhoneNumbers();
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("phone_numbers")
+    .select("*")
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as PhoneRow[]).map(mapPhone);
+}
+
+export async function createPhoneNumber(
+  input: Omit<PhoneNumber, "id" | "createdAt" | "updatedAt">,
+): Promise<PhoneNumber> {
+  if (!useRemote()) return fileStore.createPhoneNumber(input);
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("phone_numbers")
+    .insert({
+      e164: input.e164,
+      national: input.national,
+      kind: input.kind,
+      status: input.status,
+      tenant_id: input.tenantId ?? null,
+      phone_number_id: input.phoneNumberId ?? null,
+      display_name: input.displayName ?? null,
+      pin_cipher: input.pinCipher ?? null,
+      last_error: input.lastError ?? null,
+      last_code: input.lastCode ?? null,
+      cooldown_until: input.cooldownUntil ?? null,
+    })
+    .select("*")
+    .single();
+  if (error) {
+    if (/duplicate|unique/i.test(error.message)) throw new Error("number_already_in_pool");
+    throw new Error(error.message);
+  }
+  return mapPhone(data as PhoneRow);
+}
+
+export async function updatePhoneNumber(
+  id: string,
+  patch: Partial<PhoneNumber>,
+): Promise<PhoneNumber> {
+  if (!useRemote()) return fileStore.updatePhoneNumber(id, patch);
+  const sb = getSupabaseAdmin();
+  const row: Record<string, unknown> = {};
+  if (patch.status !== undefined) row.status = patch.status;
+  if (patch.tenantId !== undefined) row.tenant_id = patch.tenantId;
+  if (patch.phoneNumberId !== undefined) row.phone_number_id = patch.phoneNumberId;
+  if (patch.displayName !== undefined) row.display_name = patch.displayName;
+  if (patch.pinCipher !== undefined) row.pin_cipher = patch.pinCipher;
+  if (patch.lastError !== undefined) row.last_error = patch.lastError;
+  if (patch.lastCode !== undefined) row.last_code = patch.lastCode;
+  if (patch.cooldownUntil !== undefined) row.cooldown_until = patch.cooldownUntil;
+  const { data, error } = await sb
+    .from("phone_numbers")
+    .update(row)
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+  return mapPhone(data as PhoneRow);
 }
 
 export function greetingFor(tenant: Tenant): string {

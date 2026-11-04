@@ -11,8 +11,15 @@ import {
   getSessionUser,
   setSessionCookie,
 } from "@/lib/auth/session";
+import { hasNeon } from "@/lib/db/remote";
 import { isAdminEmail, isSupabaseAuthConfigured, isSupabaseDbConfigured } from "@/lib/auth/shared";
 import { getSupabaseAuthClient } from "@/lib/auth/supabase";
+
+function persistenceMode(): "neon" | "supabase" | "local" {
+  if (hasNeon()) return "neon";
+  if (isSupabaseDbConfigured()) return "supabase";
+  return "local";
+}
 
 export async function GET() {
   await ensureBootstrapAdmin();
@@ -20,8 +27,8 @@ export async function GET() {
   return NextResponse.json({
     user,
     supabaseConfigured: isSupabaseAuthConfigured(),
-    db: isSupabaseDbConfigured() ? "supabase" : "file",
-    mode: isSupabaseDbConfigured() ? "supabase" : "local",
+    db: persistenceMode() === "local" ? "file" : persistenceMode(),
+    mode: persistenceMode(),
   });
 }
 
@@ -80,7 +87,7 @@ export async function POST(req: NextRequest) {
       });
       await setSessionCookie(user);
       return NextResponse.json(
-        { user, mode: isSupabaseDbConfigured() ? "supabase" : "local" },
+        { user, mode: persistenceMode() },
         { status: 201 },
       );
     } catch (e) {
@@ -94,5 +101,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid_credentials" }, { status: 401 });
   }
   await setSessionCookie(user);
-  return NextResponse.json({ user, mode: "local" });
+  return NextResponse.json({ user, mode: persistenceMode() });
 }

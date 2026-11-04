@@ -216,13 +216,7 @@ export default function ProspectsPage() {
             href="/superadmin"
             className="rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold"
           >
-            Onboarding לקוחות
-          </Link>
-          <Link
-            href="/dashboard"
-            className="rounded-full border border-line bg-white px-4 py-2 text-sm"
-          >
-            דשבורד
+            לקוחות
           </Link>
         </div>
       </header>

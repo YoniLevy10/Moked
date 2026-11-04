@@ -3,7 +3,6 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { EmbeddedSignupButton } from "@/components/whatsapp/EmbeddedSignupButton";
 
 const VERTICALS = [
   { id: "clinic", label: "קליניקה / טיפול" },
@@ -52,27 +51,6 @@ export default function OnboardingPage() {
     }
   }
 
-  async function connectWhatsAppDemo() {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/whatsapp/connect", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "demo" }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message ?? data.error ?? "חיבור נכשל");
-      }
-      router.push("/dashboard");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "שגיאה");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   return (
     <main className="mx-auto flex w-full max-w-xl flex-1 flex-col px-6 py-10">
       <Link href="/" className="display mb-10 text-2xl font-extrabold text-brand-deep">
@@ -82,7 +60,7 @@ export default function OnboardingPage() {
       {step === 1 ? (
         <form onSubmit={createTenant} className="animate-rise space-y-5">
           <h1 className="display text-3xl font-bold">הקמת העסק</h1>
-          <p className="text-muted">דקה אחת — ואז מחברים WhatsApp.</p>
+          <p className="text-muted">דקה אחת — ואז מפעילים את המנוי ואת הוראות הבוט.</p>
 
           <label className="block space-y-2">
             <span className="text-sm font-medium">שם העסק</span>
@@ -145,34 +123,23 @@ export default function OnboardingPage() {
             disabled={loading}
             className="w-full rounded-full bg-brand py-3.5 font-semibold text-white hover:bg-brand-deep disabled:opacity-60"
           >
-            {loading ? "שומר..." : "המשך לחיבור WhatsApp"}
+            {loading ? "שומר..." : "המשך למנוי ולהוראות"}
           </button>
         </form>
       ) : (
         <div className="animate-rise space-y-6">
-          <h1 className="display text-3xl font-bold">חבר WhatsApp</h1>
+          <h1 className="display text-3xl font-bold">המנוי מפעיל את הבוט</h1>
           <p className="text-muted leading-relaxed">
-            מומלץ: חיבור חי ל-Meta Cloud API (Embedded Signup).
-            <br />
-            לדמו מקומי בלי Meta — השתמשו בכפתור הדמו.
+            בשלב הבא שומרים בקשת מנוי ומנסחים את הוראות הבוט. המספר ננעל מהמאגר
+            רק אחרי שהגבייה מאשרת, והבוט עונה רק אחרי אישור ההוראות.
           </p>
-
-          <EmbeddedSignupButton
-            disabled={loading}
-            onConnected={() => router.push("/dashboard")}
-            onError={setError}
-            className="w-full rounded-full bg-brand py-3.5 font-semibold text-white hover:bg-brand-deep disabled:opacity-60"
-            label="חבר WhatsApp חי דרך Meta"
-          />
-
           <button
-            disabled={loading}
-            onClick={() => void connectWhatsAppDemo()}
-            className="w-full rounded-full border border-line bg-white/70 py-3.5 font-semibold hover:bg-white disabled:opacity-60"
+            type="button"
+            onClick={() => router.push("/dashboard/bot")}
+            className="w-full rounded-full bg-brand py-3.5 font-semibold text-white hover:bg-brand-deep"
           >
-            {loading ? "מחבר..." : "חבר במצב דמו (בלי Meta)"}
+            אל המנוי וההוראות
           </button>
-
           {error && <p className="text-sm text-danger">{error}</p>}
         </div>
       )}

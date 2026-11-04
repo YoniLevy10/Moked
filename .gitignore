@@ -11,3 +11,4 @@ dist
 apps/landing/node_modules
 apps/landing/.next
 .vercel
+.env*

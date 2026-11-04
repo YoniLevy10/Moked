@@ -92,6 +92,74 @@ export const PROCESS_CATALOG: Record<
   },
 };
 
+export const SubscriptionSchema = z.object({
+  status: z
+    .enum(["inactive", "pending", "active", "past_due", "canceled"])
+    .default("inactive"),
+  renewsAt: z.string().optional(),
+  provider: z.string().optional(),
+  externalId: z.string().optional(),
+  invoiceId: z.string().optional(),
+  monthlyOutboundCap: z.number().default(1000),
+  outboundCount: z.number().default(0),
+  outboundPeriod: z.string().optional(),
+});
+export type Subscription = z.infer<typeof SubscriptionSchema>;
+
+export const BotAnswersSchema = z.object({
+  what: z.string().default(""),
+  hours: z.string().default(""),
+  forbidden: z.string().default(""),
+  handoff: z.string().default(""),
+  pasted: z.string().default(""),
+});
+export type BotAnswers = z.infer<typeof BotAnswersSchema>;
+
+export const BotInstructionsSchema = z.object({
+  draft: z.string().default(""),
+  answers: BotAnswersSchema.default({
+    what: "",
+    hours: "",
+    forbidden: "",
+    handoff: "",
+    pasted: "",
+  }),
+  approved: z.string().optional(),
+  approvedAt: z.string().optional(),
+});
+export type BotInstructions = z.infer<typeof BotInstructionsSchema>;
+
+export const PhoneNumberStatusSchema = z.enum([
+  "available",
+  "reserved",
+  "awaiting_code",
+  "registering",
+  "pending_name",
+  "live",
+  "suspended",
+  "cooldown",
+  "banned",
+]);
+export type PhoneNumberStatus = z.infer<typeof PhoneNumberStatusSchema>;
+
+export const PhoneNumberSchema = z.object({
+  id: z.string(),
+  e164: z.string(),
+  national: z.string(),
+  kind: z.enum(["live", "demo"]).default("live"),
+  status: PhoneNumberStatusSchema,
+  tenantId: z.string().optional(),
+  phoneNumberId: z.string().optional(),
+  displayName: z.string().optional(),
+  pinCipher: z.string().optional(),
+  lastError: z.string().optional(),
+  lastCode: z.string().optional(),
+  cooldownUntil: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type PhoneNumber = z.infer<typeof PhoneNumberSchema>;
+
 export const TenantSchema = z.object({
   id: z.string(),
   businessName: z.string(),
@@ -152,6 +220,21 @@ export const TenantSchema = z.object({
       }),
     )
     .default([]),
+  subscription: SubscriptionSchema.default({
+    status: "inactive",
+    monthlyOutboundCap: 1000,
+    outboundCount: 0,
+  }),
+  bot: BotInstructionsSchema.default({
+    draft: "",
+    answers: {
+      what: "",
+      hours: "",
+      forbidden: "",
+      handoff: "",
+      pasted: "",
+    },
+  }),
 });
 
 export type Tenant = z.infer<typeof TenantSchema>;

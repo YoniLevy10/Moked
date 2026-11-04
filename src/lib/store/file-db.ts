@@ -4,11 +4,13 @@ import { nanoid } from "nanoid";
 import {
   Conversation,
   Message,
+  PhoneNumber,
   PROCESS_CATALOG,
   ProcessKey,
   Tenant,
   VERTICALS,
 } from "@/lib/types";
+import { defaultBot, defaultSubscription, normalizeTenant } from "@/lib/product/model";
 import { BusinessEvent } from "@/lib/outcomes";
 import { Prospect } from "@/lib/prospects";
 
@@ -21,6 +23,7 @@ export type DbShape = {
   messages: Message[];
   businessEvents: BusinessEvent[];
   prospects: Prospect[];
+  phoneNumbers: PhoneNumber[];
   activeTenantId: string | null;
 };
 
@@ -43,6 +46,7 @@ function emptyDb(): DbShape {
     messages: [],
     businessEvents: [],
     prospects: [],
+    phoneNumbers: [],
     activeTenantId: null,
   };
 }
@@ -55,8 +59,10 @@ async function ensureDb(): Promise<DbShape> {
     return {
       ...emptyDb(),
       ...parsed,
+      tenants: (parsed.tenants ?? []).map((tenant) => normalizeTenant(tenant as Tenant)),
       businessEvents: parsed.businessEvents ?? [],
       prospects: parsed.prospects ?? [],
+      phoneNumbers: parsed.phoneNumbers ?? [],
     };
   } catch {
     const db = emptyDb();
@@ -131,6 +137,8 @@ export async function createTenant(input: {
         description: "חבילה בסיסית",
       },
     ],
+    subscription: defaultSubscription(),
+    bot: defaultBot(),
   };
   db.tenants.push(tenant);
   db.activeTenantId = tenant.id;
@@ -145,7 +153,22 @@ export async function updateTenant(
   const db = await ensureDb();
   const idx = db.tenants.findIndex((t) => t.id === tenantId);
   if (idx < 0) throw new Error("Tenant not found");
-  db.tenants[idx] = { ...db.tenants[idx], ...patch };
+  const current = db.tenants[idx];
+  db.tenants[idx] = normalizeTenant({
+    ...current,
+    ...patch,
+    whatsapp: patch.whatsapp ? { ...current.whatsapp, ...patch.whatsapp } : current.whatsapp,
+    subscription: patch.subscription
+      ? { ...current.subscription, ...patch.subscription }
+      : current.subscription,
+    bot: patch.bot
+      ? {
+          ...current.bot,
+          ...patch.bot,
+          answers: { ...current.bot.answers, ...(patch.bot.answers ?? {}) },
+        }
+      : current.bot,
+  });
   await writeDb(db);
   return db.tenants[idx];
 }
@@ -365,6 +388,46 @@ export async function deleteProspect(id: string): Promise<void> {
   const db = await ensureDb();
   db.prospects = db.prospects.filter((p) => p.id !== id);
   await writeDb(db);
+}
+
+export async function listPhoneNumbers(): Promise<PhoneNumber[]> {
+  const db = await ensureDb();
+  return db.phoneNumbers;
+}
+
+export async function createPhoneNumber(
+  input: Omit<PhoneNumber, "id" | "createdAt" | "updatedAt">,
+): Promise<PhoneNumber> {
+  const db = await ensureDb();
+  if (db.phoneNumbers.some((phone) => phone.e164 === input.e164)) {
+    throw new Error("number_already_in_pool");
+  }
+  const now = new Date().toISOString();
+  const phone: PhoneNumber = {
+    ...input,
+    id: nanoid(),
+    createdAt: now,
+    updatedAt: now,
+  };
+  db.phoneNumbers.push(phone);
+  await writeDb(db);
+  return phone;
+}
+
+export async function updatePhoneNumber(
+  id: string,
+  patch: Partial<PhoneNumber>,
+): Promise<PhoneNumber> {
+  const db = await ensureDb();
+  const idx = db.phoneNumbers.findIndex((phone) => phone.id === id);
+  if (idx < 0) throw new Error("number_not_found");
+  db.phoneNumbers[idx] = {
+    ...db.phoneNumbers[idx],
+    ...patch,
+    updatedAt: new Date().toISOString(),
+  };
+  await writeDb(db);
+  return db.phoneNumbers[idx];
 }
 
 export function greetingFor(tenant: Tenant): string {
