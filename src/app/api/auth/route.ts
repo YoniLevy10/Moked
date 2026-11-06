@@ -15,6 +15,26 @@ import { hasNeon } from "@/lib/db/remote";
 import { isAdminEmail, isSupabaseAuthConfigured, isSupabaseDbConfigured } from "@/lib/auth/shared";
 import { getSupabaseAuthClient } from "@/lib/auth/supabase";
 
+function publicAuthError(value: unknown): string {
+  const raw =
+    value instanceof Error
+      ? value.message
+      : value && typeof value === "object" && "message" in value
+        ? String((value as { message: unknown }).message)
+        : "";
+  const known: Record<string, string> = {
+    email_taken: "כבר יש חשבון עם האימייל הזה. אפשר להתחבר.",
+    invalid_credentials: "האימייל או הסיסמה לא נכונים.",
+    email_password_required: "צריך אימייל וסיסמה.",
+    register_failed: "לא הצלחנו ליצור את החשבון. נסו שוב.",
+  };
+  if (known[raw]) return known[raw];
+  if (/fetch failed|ENOTFOUND|getaddrinfo/i.test(raw)) {
+    return "שירות החשבונות לא זמין כרגע. נסו שוב בעוד רגע.";
+  }
+  return "לא הצלחנו להשלים את הפעולה. נסו שוב.";
+}
+
 function persistenceMode(): "neon" | "supabase" | "local" {
   if (hasNeon()) return "neon";
   if (isSupabaseDbConfigured()) return "supabase";
@@ -40,7 +60,15 @@ const Body = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const body = Body.parse(await req.json());
+  let body: z.infer<typeof Body>;
+  try {
+    body = Body.parse(await req.json());
+  } catch {
+    return NextResponse.json(
+      { error: "הפרטים שנשלחו לא תקינים." },
+      { status: 400 },
+    );
+  }
 
   if (body.action === "logout") {
     await clearSessionCookie();
@@ -49,32 +77,37 @@ export async function POST(req: NextRequest) {
 
   if (!body.email || !body.password) {
     return NextResponse.json(
-      { error: "email_password_required" },
+      { error: publicAuthError(new Error("email_password_required")) },
       { status: 400 },
     );
   }
 
-  // Prefer Supabase when configured (same pattern as Fixly/OpsBrain).
+  // An external auth host is optional. Accounts live in the app database.
   const supabase = getSupabaseAuthClient();
   if (supabase && body.action === "login") {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: body.email,
-      password: body.password,
-    });
-    if (error || !data.user) {
-      // Fall through to local demo auth so bootstrap admin still works.
-    } else {
-      const email = data.user.email ?? body.email;
-      const user = await upsertExternalUser({
-        id: data.user.id,
-        email,
-        name:
-          (data.user.user_metadata?.full_name as string) ||
-          body.email.split("@")[0],
-        role: isAdminEmail(email) ? "superadmin" : "owner",
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: body.email,
+        password: body.password,
       });
-      await setSessionCookie(user);
-      return NextResponse.json({ user, mode: "supabase" });
+      if (!error && data.user) {
+        const email = data.user.email ?? body.email;
+        const user = await upsertExternalUser({
+          id: data.user.id,
+          email,
+          name:
+            (data.user.user_metadata?.full_name as string) ||
+            body.email.split("@")[0],
+          role: isAdminEmail(email) ? "superadmin" : "owner",
+        });
+        await setSessionCookie(user);
+        return NextResponse.json({ user, mode: "supabase" });
+      }
+    } catch (e) {
+      console.error(
+        "supabase_login_failed",
+        e instanceof Error ? e.message : "unknown",
+      );
     }
   }
 
@@ -91,14 +124,17 @@ export async function POST(req: NextRequest) {
         { status: 201 },
       );
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "error";
-      return NextResponse.json({ error: msg }, { status: 400 });
+      console.error("register_failed", e instanceof Error ? e.message : "unknown");
+      return NextResponse.json({ error: publicAuthError(e) }, { status: 400 });
     }
   }
 
   const user = await authenticateLocal(body.email, body.password);
   if (!user) {
-    return NextResponse.json({ error: "invalid_credentials" }, { status: 401 });
+    return NextResponse.json(
+      { error: publicAuthError(new Error("invalid_credentials")) },
+      { status: 401 },
+    );
   }
   await setSessionCookie(user);
   return NextResponse.json({ user, mode: persistenceMode() });

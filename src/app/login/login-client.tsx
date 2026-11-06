@@ -51,7 +51,12 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "שגיאת התחברות");
-      const dest = next.startsWith("/superadmin") ? "/dashboard" : next;
+      const dest =
+        mode === "register"
+          ? "/onboarding"
+          : next.startsWith("/superadmin")
+            ? "/dashboard"
+            : next;
       router.replace(dest);
     } catch (err) {
       setError(err instanceof Error ? err.message : "שגיאה");
@@ -66,9 +71,6 @@ export default function LoginPage() {
         MOKED
       </Link>
       <h1 className="display text-3xl font-bold">כניסה במייל</h1>
-      <p className="mt-2 text-sm text-muted">
-        כמו ב־Fixly / OpsBrain — מייל וסיסמה.
-      </p>
 
       <div className="mt-6 flex gap-2">
         <button
