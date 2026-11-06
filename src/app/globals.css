@@ -1736,6 +1736,69 @@ a {
   }
 }
 
+.admin-screen {
+  background: #e4ece7;
+  color: #17251f;
+}
+
+.admin-screen > header,
+.admin-screen > header a,
+.admin-screen > header button {
+  color: #fff;
+}
+
+.admin-screen > header a.bg-white {
+  color: #07583f;
+}
+
+.admin-screen main a.bg-brand,
+.admin-screen main button.bg-brand {
+  background-color: #087a55;
+  color: #fff;
+}
+
+.admin-screen .text-muted {
+  color: #24352c;
+}
+
+.admin-screen input,
+.admin-screen select,
+.admin-screen textarea {
+  background: #fff;
+  color: #17251f;
+  border-color: #5c7268;
+}
+
+.admin-screen input::placeholder,
+.admin-screen textarea::placeholder {
+  color: #3e5248;
+}
+
+.admin-screen input[type="checkbox"] {
+  accent-color: #07583f;
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.admin-screen label {
+  color: #17251f;
+  font-weight: 650;
+}
+
+.admin-screen main :is(form, section, .rounded-3xl, .rounded-2xl) {
+  border-color: #6d8278;
+}
+
+.admin-screen main :is(form, .rounded-3xl, .rounded-2xl) {
+  background-color: #fff;
+}
+
+.admin-screen main :is(a, button).border {
+  border-color: #3f564c;
+  color: #17251f;
+  background: #fff;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

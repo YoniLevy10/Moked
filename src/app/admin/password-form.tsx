@@ -28,9 +28,9 @@ export function AdminPasswordForm() {
   }
 
   return (
-    <main className="mx-auto flex min-h-[80vh] w-full max-w-md flex-col justify-center px-4">
-      <h1 className="display text-3xl font-bold">ניהול מוקד</h1>
-      <p className="mt-2 text-sm text-muted">הכניסה למסך הזה נעולה בסיסמה.</p>
+    <main className="admin-screen mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4">
+      <h1 className="display text-3xl font-bold text-ink">ניהול מוקד</h1>
+      <p className="mt-2 text-sm text-ink">הכניסה למסך הזה נעולה בסיסמה.</p>
       <form onSubmit={onSubmit} className="mt-6 space-y-3">
         <input
           type="password"

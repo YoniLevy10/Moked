@@ -26,12 +26,12 @@ export function SuperadminShell({
   }
 
   return (
-    <div className="min-h-full bg-brand-deep/5">
-      <header className="border-b border-line bg-brand-deep text-white">
+    <div className="admin-screen min-h-full">
+      <header className="border-b border-white/20 bg-brand-deep text-white">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4">
           <div>
-            <p className="text-xs font-semibold tracking-wide text-white/70">ניהול מוקד</p>
-            <p className="text-sm">{name}</p>
+            <p className="text-xs font-semibold tracking-wide text-white">ניהול מוקד</p>
+            <p className="text-sm text-white">{name}</p>
           </div>
           <nav className="flex flex-wrap items-center gap-2">
             {NAV.map((item) => {
@@ -44,7 +44,9 @@ export function SuperadminShell({
                   key={item.href}
                   href={item.href}
                   className={`rounded-full px-4 py-2 text-sm font-medium ${
-                    active ? "bg-white text-brand-deep" : "text-white/80 hover:bg-white/10"
+                    active
+                      ? "bg-white text-brand-deep"
+                      : "border border-white/80 text-white hover:bg-white/15"
                   }`}
                 >
                   {item.label}
@@ -54,7 +56,7 @@ export function SuperadminShell({
             <button
               type="button"
               onClick={() => void logout()}
-              className="rounded-full border border-white/30 px-4 py-2 text-sm"
+              className="rounded-full border border-white px-4 py-2 text-sm text-white"
             >
               יציאה
             </button>
