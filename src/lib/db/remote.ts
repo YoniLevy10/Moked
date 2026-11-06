@@ -16,6 +16,11 @@ type Filter =
   | { kind: "in"; column: string; values: unknown[] };
 
 const IDENT = /^[a-z_][a-z0-9_]*$/;
+
+/** Neon query() rejects raw JS arrays for jsonb parameters. */
+function sqlParam(value: unknown): unknown {
+  return Array.isArray(value) ? JSON.stringify(value) : value;
+}
 const CONFLICT: Record<string, string> = {
   profiles: "id",
   tenant_secrets: "tenant_id",
@@ -181,7 +186,7 @@ class NeonQuery implements PromiseLike<DbResult<unknown>> {
     if (this.mode === "update") {
       const row = rows[0];
       const sets = columns.map((column) => {
-        params.push(row[column]);
+        params.push(sqlParam(row[column]));
         return `${column} = $${params.length}`;
       });
       const order = "";
@@ -194,7 +199,7 @@ class NeonQuery implements PromiseLike<DbResult<unknown>> {
     const values: string[] = [];
     for (const row of rows) {
       const slots = columns.map((column) => {
-        params.push(row[column]);
+        params.push(sqlParam(row[column]));
         return `$${params.length}`;
       });
       values.push(`(${slots.join(", ")})`);

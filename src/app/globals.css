@@ -11,7 +11,7 @@
   --brand-soft: #e0f0e8;
   --accent: #d4a017;
   --accent-foreground: #302707;
-  --line: rgba(23, 37, 31, 0.12);
+  --line: rgba(23, 37, 31, 0.34);
   --ok: #1f7047;
   --warn: #9d6500;
   --danger: #a33b2d;
@@ -1734,6 +1734,10 @@ a {
   .site-footer__copyright {
     grid-column: auto;
   }
+}
+
+.text-muted {
+  color: #24352c;
 }
 
 .admin-screen {

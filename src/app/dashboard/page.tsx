@@ -32,6 +32,7 @@ type OutcomesResponse = {
 
 const EVENT_LABELS: Record<string, string> = {
   "lead.created": "ליד נוצר",
+  "owner.notified": "התראה לבעל העסק",
   "lead.qualified": "ליד סונן",
   "lead.hot": "ליד חם",
   "booking.confirmed": "תור נקבע",
@@ -253,10 +254,6 @@ export default function DashboardHome() {
           <Link href="/dashboard/bot" className="font-semibold text-brand underline">
             המנוי והבוט
           </Link>
-        </p>
-        <p className="mt-1 max-w-2xl text-sm text-muted">
-          לא כמה הודעות נשלחו — כמה לידים נסגרו, תורים נקבעו, הכנסות נוצרו
-          ולקוחות הוחזרו.
         </p>
       </section>
 

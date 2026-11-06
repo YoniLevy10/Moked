@@ -21,15 +21,20 @@ export function handleBooking(ctx: ProcessContext): ProcessResult {
       handled: true,
       replies: [
         {
-          body: `אפשרויות קרובות:${hint}\n1) ${slots[0]}\n2) ${slots[1]}\n3) ${slots[2]}\n\nהשב/י 1, 2 או 3 — או כתוב/י מועד אחר.`,
+          body: `אפשרויות קרובות:${hint}\n1) ${slots[0]?.label}\n2) ${slots[1]?.label}\n3) ${slots[2]?.label}\n\nהשב/י 1, 2 או 3 — או כתוב/י מועד אחר.`,
           type: "interactive",
           processKey: "booking",
         },
       ],
       conversationPatch: {
         activeProcess: "booking",
-        booking: { proposedSlots: slots },
-        processState: { ...state, bookingOffered: true, bookingStep: "slot" },
+        booking: { proposedSlots: slots.map((slot) => slot.label) },
+        processState: {
+          ...state,
+          bookingOffered: true,
+          bookingStep: "slot",
+          slotStartsAt: slots.map((slot) => slot.startsAt),
+        },
       },
       events: ["booking.proposed"],
     };
@@ -38,12 +43,15 @@ export function handleBooking(ctx: ProcessContext): ProcessResult {
   // Step 2 — confirm slot (if not yet confirmed)
   if (!booking.confirmedAt) {
     const idx = ["1", "2", "3"].includes(text) ? Number(text) - 1 : -1;
+    const starts = Array.isArray(state.slotStartsAt) ? state.slotStartsAt : [];
     const confirmed =
       idx >= 0 && booking.proposedSlots
         ? booking.proposedSlots[idx]
         : text.length > 2
           ? text
           : null;
+    const startsAt =
+      idx >= 0 && typeof starts[idx] === "string" ? starts[idx] : undefined;
 
     if (!confirmed) {
       return {
@@ -70,6 +78,7 @@ export function handleBooking(ctx: ProcessContext): ProcessResult {
         booking: {
           ...booking,
           confirmedAt: confirmed,
+          startsAt,
           reminder24Sent: false,
           reminder2Sent: false,
         },
@@ -77,6 +86,7 @@ export function handleBooking(ctx: ProcessContext): ProcessResult {
           ...state,
           bookingStep: "address",
           slotConfirmed: confirmed,
+          startsAt,
         },
       },
       events: ["booking.slot_chosen"],

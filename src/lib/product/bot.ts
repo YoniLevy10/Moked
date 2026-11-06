@@ -11,19 +11,42 @@ function wantsBooking(text: string): boolean {
   return /תור|לקבוע|קביעת|מחר|היום|שעה/.test(text);
 }
 
+function block(title: string, body: string | undefined): string | null {
+  const text = body?.trim();
+  if (!text) return null;
+  return `## ${title}\n${text}`;
+}
+
+/** System prompt the owner reviews and approves for the WhatsApp bot. */
 export function compileInstructions(tenant: Tenant): string {
   const answers = tenant.bot.answers;
-  return [
-    `אתה המזכיר הדיגיטלי של ${tenant.businessName}.`,
+  const facts = [
     answers.what && `מה העסק עושה: ${answers.what}`,
     answers.hours && `שעות פעילות: ${answers.hours}`,
     answers.forbidden && `אסור: ${answers.forbidden}`,
     answers.handoff && `מתי להעביר לאדם: ${answers.handoff}`,
-    answers.pasted && `הוראות שהודבקו:\n${answers.pasted}`,
-    "ענה בעברית, קצר, ובלי להמציא מחירים או הבטחות שלא כתובות כאן.",
+    answers.pasted && answers.pasted.trim(),
   ]
     .filter(Boolean)
     .join("\n");
+
+  return [
+    `# הנחיית מערכת — מזכיר הוואטסאפ של ${tenant.businessName}`,
+    "",
+    "## תפקיד",
+    `אתה המזכיר הדיגיטלי של ${tenant.businessName}. אתה עונה ללקוחות בוואטסאפ בעברית, בגוף ראשון, בקצרה, ובטון של מזכירות מקצועית.`,
+    block("עובדות העסק", facts),
+    [
+      "## כללי מענה",
+      "- ענה רק לפי העובדות שכתובות כאן. אל תמציא מחיר, זמן תיקון, אחריות או הבטחה.",
+      "- בכל הודעה שאל שאלה אחת חסרה: מה התקלה, דגם המכשיר, מתי נוח, או כתובת.",
+      "- בקשת תור: הצע מועד ובקש בחירה. אל תאשר שעה שהלקוח לא בחר.",
+      "- בקשה שחורגת מההנחיות, או מחיר שלא רשום: אמור שבעל העסק יחזור עם תשובה.",
+      "- סיים כל הודעה בצעד הבא הברור ללקוח.",
+    ].join("\n"),
+  ]
+    .filter((line): line is string => Boolean(line))
+    .join("\n\n");
 }
 
 export function hasLlmKey(): boolean {
@@ -48,7 +71,7 @@ export async function rewriteInstructions(tenant: Tenant): Promise<string> {
         {
           role: "system",
           content:
-            "נסח הוראות הפעלה קצרות למזכיר וואטסאפ של עסק ישראלי. החזר רק את נוסח ההוראות.",
+            "הפוך את הטקסט להנחיית מערכת מקצועית למזכיר וואטסאפ. שמור על המבנה: תפקיד, עובדות העסק, כללי מענה. אל תוסיף מחירים או הבטחות שלא נכתבו. החזר רק את ההנחיה.",
         },
         { role: "user", content: compiled },
       ],

@@ -255,6 +255,7 @@ export const ConversationSchema = z.object({
     .object({
       proposedSlots: z.array(z.string()).optional(),
       confirmedAt: z.string().optional(),
+      startsAt: z.string().optional(),
       reminder24Sent: z.boolean().optional(),
       reminder2Sent: z.boolean().optional(),
       attended: z.boolean().optional(),

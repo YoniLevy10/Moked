@@ -6,8 +6,9 @@ import {
   updateConversation,
   updateTenant,
 } from "@/lib/store/db";
-import { replyFromInstructions, outboundPeriod } from "@/lib/product/bot";
-import { currentPeriod } from "@/lib/product/model";
+import { outboundPeriod } from "@/lib/product/bot";
+import { currentPeriod, toE164Il } from "@/lib/product/model";
+import { sendWhatsAppText } from "@/lib/whatsapp/client";
 import { Conversation, ProcessKey, Tenant } from "@/lib/types";
 import { handleIntake } from "@/lib/processes/waves/intake";
 import { handleQualification } from "@/lib/processes/waves/qualification";
@@ -317,49 +318,10 @@ export async function handleInboundMessage(input: {
   const liveNumber = numbers.find(
     (phone) => phone.tenantId === input.tenant.id && phone.status === "live",
   );
-  const useInstructions =
-    input.tenant.subscription.status === "active" &&
-    Boolean(input.tenant.bot.approved) &&
-    Boolean(liveNumber);
-
+  const metered = Boolean(liveNumber);
   let result: ProcessResult;
-  if (useInstructions) {
-    const room = outboundPeriod(input.tenant);
-    if (room.blocked) {
-      result = { handled: true, replies: [], events: ["bot.cap_reached"] };
-    } else {
-      const decision = await replyFromInstructions(input.tenant, input.text);
-      const alreadyLead = Boolean(conversation.processState.leadRecorded);
-      const events = [
-        decision.lead && !alreadyLead ? "lead.created" : "",
-        decision.booking && !conversation.booking?.confirmedAt ? "booking.confirmed" : "",
-      ].filter(Boolean);
-      result = {
-        handled: true,
-        replies: [{ body: decision.reply, processKey: "intake" }],
-        events,
-        conversationPatch: {
-          processState: {
-            ...conversation.processState,
-            leadRecorded: alreadyLead || decision.lead,
-          },
-          ...(decision.booking
-            ? { booking: { confirmedAt: new Date().toISOString() } }
-            : {}),
-        },
-      };
-      const period = currentPeriod();
-      const count = (input.tenant.subscription.outboundPeriod === period
-        ? input.tenant.subscription.outboundCount
-        : 0) + 1;
-      await updateTenant(input.tenant.id, {
-        subscription: {
-          ...input.tenant.subscription,
-          outboundPeriod: period,
-          outboundCount: count,
-        },
-      });
-    }
+  if (metered && outboundPeriod(input.tenant).blocked) {
+    result = { handled: true, replies: [], events: ["bot.cap_reached"] };
   } else {
     result = runActiveProcess(input.tenant, conversation, input.text);
   }
@@ -379,9 +341,53 @@ export async function handleInboundMessage(input: {
     channel,
   });
 
+  if (metered && result.replies.length > 0) {
+    const period = currentPeriod();
+    const count =
+      (input.tenant.subscription.outboundPeriod === period
+        ? input.tenant.subscription.outboundCount
+        : 0) + result.replies.length;
+    await updateTenant(input.tenant.id, {
+      subscription: {
+        ...input.tenant.subscription,
+        outboundPeriod: period,
+        outboundCount: count,
+      },
+    });
+  }
+
   await persistEvents(input.tenant, conversation, result.events, channel);
 
+  if (result.events?.includes("lead.created")) {
+    const notified = await notifyOwner({
+      tenant: input.tenant,
+      customerWaId: input.customerWaId,
+      customerName: input.customerName,
+      text: input.text,
+    });
+    if (notified) {
+      await persistEvents(input.tenant, conversation, ["owner.notified"], channel);
+    }
+  }
+
   return { conversation, result };
+}
+
+async function notifyOwner(input: {
+  tenant: Tenant;
+  customerWaId: string;
+  customerName?: string;
+  text: string;
+}) {
+  const to = toE164Il(input.tenant.phone);
+  if (!to) return false;
+  const who = input.customerName || input.customerWaId;
+  await sendWhatsAppText({
+    tenant: input.tenant,
+    to,
+    body: `ליד חדש ב־${input.tenant.businessName}: ${who}\n${input.text.slice(0, 160)}`,
+  });
+  return true;
 }
 
 export async function triggerReminder(input: {

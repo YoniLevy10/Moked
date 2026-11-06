@@ -6,6 +6,7 @@ import { z } from "zod";
  */
 export const BusinessEventTypeSchema = z.enum([
   "lead.created",
+  "owner.notified",
   "lead.qualification_started",
   "lead.qualified",
   "lead.hot",

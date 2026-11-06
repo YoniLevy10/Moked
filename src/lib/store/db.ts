@@ -259,7 +259,13 @@ function mapConversation(row: ConversationRow): Conversation {
     booking: hasBooking
       ? {
           proposedSlots: row.booking_proposed_slots ?? [],
-          confirmedAt: row.booking_confirmed_at ?? undefined,
+          confirmedAt:
+            (typeof row.process_state?.slotConfirmed === "string"
+              ? row.process_state.slotConfirmed
+              : undefined) ??
+            row.booking_confirmed_at ??
+            undefined,
+          startsAt: row.booking_confirmed_at ?? undefined,
           reminder24Sent: row.booking_reminder_24_sent,
           reminder2Sent: row.booking_reminder_2_sent,
           attended: row.booking_attended ?? undefined,
@@ -745,6 +751,21 @@ export async function updateConversation(
 
   const addressFromState =
     typeof processState.address === "string" ? processState.address : null;
+  const isoTime = (value: unknown) =>
+    typeof value === "string" && !Number.isNaN(Date.parse(value)) ? value : undefined;
+  const slotStarts = Array.isArray(processState.slotStartsAt)
+    ? processState.slotStartsAt
+    : [];
+  const slotLabel =
+    typeof processState.slotConfirmed === "string" ? processState.slotConfirmed : undefined;
+  const slotIndex = slotLabel
+    ? (booking?.proposedSlots ?? []).indexOf(slotLabel)
+    : -1;
+  const startsAt =
+    isoTime(booking?.startsAt) ??
+    isoTime(current.booking?.startsAt) ??
+    isoTime(processState.startsAt) ??
+    (slotIndex >= 0 ? isoTime(slotStarts[slotIndex]) : undefined);
 
   const { data, error } = await sb
     .from("conversations")
@@ -763,7 +784,7 @@ export async function updateConversation(
           : current.activeProcess ?? null,
       process_state: processState,
       booking_proposed_slots: booking?.proposedSlots ?? [],
-      booking_confirmed_at: booking?.confirmedAt ?? null,
+      booking_confirmed_at: startsAt ?? null,
       booking_reminder_24_sent: booking?.reminder24Sent ?? false,
       booking_reminder_2_sent: booking?.reminder2Sent ?? false,
       booking_attended: booking?.attended ?? null,
