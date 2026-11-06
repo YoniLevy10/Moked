@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
+import { hasAdminGate } from "@/lib/auth/admin-gate";
 import { AuthUser } from "@/lib/auth/shared";
-import {
-  getSessionUser,
-  requireSessionUser,
-  requireSuperadmin,
-} from "@/lib/auth/session";
+import { getSessionUser, requireSessionUser } from "@/lib/auth/session";
 import { linkUserToTenant } from "@/lib/auth/local-store";
 import {
   getActiveTenant,
@@ -65,21 +62,26 @@ export async function requireTenantContext(): Promise<
   }
 }
 
+const GATE_USER: AuthUser = {
+  id: "admin-gate",
+  email: "admin@moked.local",
+  name: "מנהל",
+  role: "superadmin",
+  createdAt: "1970-01-01T00:00:00.000Z",
+};
+
 export async function requireSuperadminContext(): Promise<
   | { ok: true; user: AuthUser }
   | { ok: false; response: NextResponse }
 > {
-  try {
-    const user = await requireSuperadmin();
-    return { ok: true, user };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "forbidden";
-    const status = msg === "unauthorized" ? 401 : 403;
+  if (!(await hasAdminGate())) {
     return {
       ok: false,
-      response: NextResponse.json({ error: msg }, { status }),
+      response: NextResponse.json({ error: "unauthorized" }, { status: 401 }),
     };
   }
+  const user = await getSessionUser();
+  return { ok: true, user: user ?? GATE_USER };
 }
 
 /** Superadmin switches which tenant the dashboard APIs see. */

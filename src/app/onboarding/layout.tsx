@@ -8,6 +8,5 @@ export default async function OnboardingLayout({
 }) {
   const user = await getSessionUser();
   if (!user) redirect("/login?next=/onboarding");
-  if (user.role === "superadmin") redirect("/superadmin");
   return children;
 }

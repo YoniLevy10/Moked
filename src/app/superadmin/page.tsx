@@ -32,16 +32,7 @@ export default function SuperadminPage() {
 
   async function refresh() {
     const auth = await fetch("/api/auth").then((r) => r.json());
-    if (!auth.user) {
-      router.replace("/login?next=/superadmin");
-      return;
-    }
-    if (auth.user.role !== "superadmin") {
-      setError("אין הרשאת superadmin. הוסף את המייל ל־ADMIN_EMAILS.");
-      setMe(auth.user);
-      return;
-    }
-    setMe(auth.user);
+    if (auth.user?.role === "superadmin") setMe(auth.user);
     const res = await fetch("/api/superadmin/tenants");
     if (res.status === 403 || res.status === 401) {
       setError("forbidden");
@@ -118,12 +109,9 @@ export default function SuperadminPage() {
   }
 
   async function logout() {
-    await fetch("/api/auth", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "logout" }),
-    });
-    router.push("/login");
+    await fetch("/api/admin/gate", { method: "DELETE" });
+    router.push("/admin");
+    router.refresh();
   }
 
   if (me && me.role !== "superadmin") {
@@ -131,7 +119,7 @@ export default function SuperadminPage() {
       <main className="mx-auto w-full max-w-lg px-4 py-16 text-center">
         <h1 className="display text-2xl font-bold">אין הרשאה</h1>
         <p className="mt-2 text-muted">{error}</p>
-        <Link href="/superadmin" className="mt-6 inline-block text-brand underline">
+        <Link href="/admin" className="mt-6 inline-block text-brand underline">
           חזרה ללקוחות
         </Link>
       </main>
@@ -147,7 +135,7 @@ export default function SuperadminPage() {
           {me && (
             <p className="mt-1 text-sm text-muted">
               {me.name} · {me.email} ·{" "}
-              <Link href="/superadmin/prospects" className="text-brand underline">
+              <Link href="/admin/prospects" className="text-brand underline">
                 וולידציה / לידים
               </Link>
             </p>
@@ -155,13 +143,13 @@ export default function SuperadminPage() {
         </div>
         <div className="flex gap-2">
           <Link
-            href="/superadmin/prospects"
+            href="/admin/prospects"
             className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white"
           >
             מנוע לידים
           </Link>
           <Link
-            href="/superadmin/numbers"
+            href="/admin/numbers"
             className="rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold"
           >
             מאגר מספרים

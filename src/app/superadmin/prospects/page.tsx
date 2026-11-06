@@ -2,7 +2,6 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   OUTREACH_TEMPLATES,
   PROSPECT_STATUS_LABELS,
@@ -19,7 +18,6 @@ type Template = (typeof OUTREACH_TEMPLATES)[number];
 const STATUSES = Object.keys(PROSPECT_STATUS_LABELS) as ProspectStatus[];
 
 export default function ProspectsPage() {
-  const router = useRouter();
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [funnel, setFunnel] = useState<ProspectFunnelStats>(emptyFunnelStats());
   const [templates, setTemplates] = useState<Template[]>([...OUTREACH_TEMPLATES]);
@@ -43,15 +41,6 @@ export default function ProspectsPage() {
   const [bulk, setBulk] = useState("");
 
   async function refresh() {
-    const auth = await fetch("/api/auth").then((r) => r.json());
-    if (!auth.user) {
-      router.replace("/login?next=/superadmin/prospects");
-      return;
-    }
-    if (auth.user.role !== "superadmin") {
-      setError("אין הרשאת superadmin");
-      return;
-    }
     const res = await fetch("/api/superadmin/prospects");
     if (!res.ok) {
       setError("לא ניתן לטעון לידים");
@@ -213,7 +202,7 @@ export default function ProspectsPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Link
-            href="/superadmin"
+            href="/admin"
             className="rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold"
           >
             לקוחות

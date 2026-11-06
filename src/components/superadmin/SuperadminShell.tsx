@@ -4,9 +4,9 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 const NAV = [
-  { href: "/superadmin", label: "לקוחות" },
-  { href: "/superadmin/prospects", label: "לידים" },
-  { href: "/superadmin/numbers", label: "מספרים" },
+  { href: "/admin", label: "לקוחות" },
+  { href: "/admin/prospects", label: "לידים" },
+  { href: "/admin/numbers", label: "מספרים" },
 ];
 
 export function SuperadminShell({
@@ -20,12 +20,9 @@ export function SuperadminShell({
   const router = useRouter();
 
   async function logout() {
-    await fetch("/api/auth", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "logout" }),
-    });
-    router.push("/login");
+    await fetch("/api/admin/gate", { method: "DELETE" });
+    router.push("/admin");
+    router.refresh();
   }
 
   return (
@@ -39,8 +36,8 @@ export function SuperadminShell({
           <nav className="flex flex-wrap items-center gap-2">
             {NAV.map((item) => {
               const active =
-                item.href === "/superadmin"
-                  ? pathname === "/superadmin"
+                item.href === "/admin"
+                  ? pathname === "/admin"
                   : pathname.startsWith(item.href);
               return (
                 <Link

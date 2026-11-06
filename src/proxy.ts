@@ -27,10 +27,13 @@ async function hasValidSession(req: NextRequest): Promise<boolean> {
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  if (pathname.startsWith("/superadmin")) {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+
   const protectedPath =
     pathname.startsWith("/dashboard") ||
-    pathname.startsWith("/onboarding") ||
-    pathname.startsWith("/superadmin");
+    pathname.startsWith("/onboarding");
 
   if (!protectedPath) return NextResponse.next();
 

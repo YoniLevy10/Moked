@@ -23,7 +23,7 @@ export default function LoginPage() {
       .then((r) => r.json())
       .then((d) => {
         if (d.user) {
-          router.replace(d.user.role === "superadmin" ? "/superadmin" : next);
+          router.replace(next.startsWith("/superadmin") ? "/dashboard" : next);
         }
         if (d.mode === "local") {
           setInfo(
@@ -51,7 +51,7 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "שגיאת התחברות");
-      const dest = data.user?.role === "superadmin" ? "/superadmin" : next;
+      const dest = next.startsWith("/superadmin") ? "/dashboard" : next;
       router.replace(dest);
     } catch (err) {
       setError(err instanceof Error ? err.message : "שגיאה");
