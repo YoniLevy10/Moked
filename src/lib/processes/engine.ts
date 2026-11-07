@@ -23,6 +23,8 @@ import { handlePayment } from "@/lib/processes/waves/payment";
 import { ProcessResult } from "@/lib/processes/types";
 import { resolveChannel } from "@/lib/channels";
 import { MessagingChannel } from "@/lib/channels/types";
+import { runAgentTurn } from "@/lib/agent";
+import { notifyOwnerFromAgent } from "@/lib/agent/notify";
 
 function enabled(tenant: Tenant, key: ProcessKey): boolean {
   return Boolean(tenant.processes[key]?.enabled);
@@ -323,7 +325,56 @@ export async function handleInboundMessage(input: {
   if (metered && outboundPeriod(input.tenant).blocked) {
     result = { handled: true, replies: [], events: ["bot.cap_reached"] };
   } else {
-    result = runActiveProcess(input.tenant, conversation, input.text);
+    const agent = await runAgentTurn({
+      tenant: input.tenant,
+      conversation,
+      inboundText: input.text,
+    });
+    if (agent.handled) {
+      result = {
+        handled: true,
+        replies: agent.replies,
+        conversationPatch: agent.conversationPatch,
+        events: agent.events,
+      };
+      if (agent.decision.nextAction === "escalate") {
+        await notifyOwnerFromAgent({
+          tenant: input.tenant,
+          conversation,
+          reason: agent.decision.intent,
+          inboundText: input.text,
+        });
+      }
+    } else {
+      // Agent routed a process or passed through — keep deterministic engine ownership
+      const routed = agent.decision.processKey
+        ? {
+            ...conversation,
+            ...(agent.conversationPatch ?? {}),
+            activeProcess:
+              agent.decision.processKey ?? conversation.activeProcess,
+          }
+        : { ...conversation, ...(agent.conversationPatch ?? {}) };
+      result = runActiveProcess(input.tenant, routed, input.text);
+      if (agent.conversationPatch?.agent && result.conversationPatch) {
+        result = {
+          ...result,
+          conversationPatch: {
+            ...result.conversationPatch,
+            agent: {
+              ...(routed.agent ?? {}),
+              ...(agent.conversationPatch.agent ?? {}),
+              ...(result.conversationPatch.agent ?? {}),
+            },
+          },
+        };
+      } else if (agent.conversationPatch && !result.conversationPatch) {
+        result = {
+          ...result,
+          conversationPatch: agent.conversationPatch,
+        };
+      }
+    }
   }
 
   if (result.conversationPatch) {

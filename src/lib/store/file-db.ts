@@ -13,6 +13,7 @@ import {
 import { defaultBot, defaultSubscription, normalizeTenant } from "@/lib/product/model";
 import { BusinessEvent } from "@/lib/outcomes";
 import { Prospect } from "@/lib/prospects";
+import type { TenantKnowledgeRow } from "@/lib/agent/types";
 
 const DATA_DIR = path.join(process.cwd(), ".data");
 const DB_FILE = path.join(DATA_DIR, "db.json");
@@ -24,6 +25,7 @@ export type DbShape = {
   businessEvents: BusinessEvent[];
   prospects: Prospect[];
   phoneNumbers: PhoneNumber[];
+  tenantKnowledge: TenantKnowledgeRow[];
   activeTenantId: string | null;
 };
 
@@ -47,6 +49,7 @@ function emptyDb(): DbShape {
     businessEvents: [],
     prospects: [],
     phoneNumbers: [],
+    tenantKnowledge: [],
     activeTenantId: null,
   };
 }
@@ -63,6 +66,7 @@ async function ensureDb(): Promise<DbShape> {
       businessEvents: parsed.businessEvents ?? [],
       prospects: parsed.prospects ?? [],
       phoneNumbers: parsed.phoneNumbers ?? [],
+      tenantKnowledge: parsed.tenantKnowledge ?? [],
     };
   } catch {
     const db = emptyDb();
@@ -247,6 +251,7 @@ export async function getOrCreateConversation(input: {
     status: "open",
     intent: "unknown",
     processState: {},
+    agent: {},
     updatedAt: now,
     createdAt: now,
   };
@@ -277,10 +282,32 @@ export async function updateConversation(
     payment: patch.payment
       ? { ...current.payment, ...patch.payment }
       : current.payment,
+    agent:
+      patch.agent !== undefined
+        ? { ...(current.agent ?? {}), ...patch.agent }
+        : current.agent ?? {},
     updatedAt: new Date().toISOString(),
   };
   await writeDb(db);
   return db.conversations[idx];
+}
+
+export async function listTenantKnowledge(
+  tenantId: string,
+): Promise<TenantKnowledgeRow[]> {
+  const db = await ensureDb();
+  return db.tenantKnowledge.filter((row) => row.tenantId === tenantId);
+}
+
+export async function upsertTenantKnowledge(
+  row: TenantKnowledgeRow,
+): Promise<TenantKnowledgeRow> {
+  const db = await ensureDb();
+  const idx = db.tenantKnowledge.findIndex((r) => r.id === row.id);
+  if (idx >= 0) db.tenantKnowledge[idx] = row;
+  else db.tenantKnowledge.push(row);
+  await writeDb(db);
+  return row;
 }
 
 export async function addMessage(

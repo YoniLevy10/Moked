@@ -99,6 +99,7 @@ type ConversationRow = {
   payment_status: NonNullable<Conversation["payment"]>["status"];
   payment_provider: string | null;
   payment_external_id: string | null;
+  agent?: Conversation["agent"] | null;
   created_at: string;
   updated_at: string;
 };
@@ -141,12 +142,12 @@ type ProspectRow = {
   updated_at: string;
 };
 
-function useRemote(): boolean {
+function isRemoteDb(): boolean {
   return hasRemoteDb();
 }
 
-function getSupabaseAdmin(): { from: (table: string) => any } {
-  return getRemote() as { from: (table: string) => any };
+function getSupabaseAdmin(): ReturnType<typeof getRemote> {
+  return getRemote();
 }
 
 function defaultProcesses(): Tenant["processes"] {
@@ -288,6 +289,7 @@ function mapConversation(row: ConversationRow): Conversation {
           provider: row.payment_provider ?? undefined,
         }
       : undefined,
+    agent: row.agent ?? {},
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -373,9 +375,10 @@ async function loadAllTenants(): Promise<Tenant[]> {
     .select("*")
     .order("created_at", { ascending: true });
   if (error) throw error;
-  if (!rows?.length) return [];
+  const tenantRows = (rows ?? []) as Array<{ id: string }>;
+  if (!tenantRows.length) return [];
 
-  const ids = (rows as Array<{ id: string }>).map((r) => r.id);
+  const ids = tenantRows.map((r) => r.id);
   const [{ data: processes }, { data: pricing }, { data: secrets }] =
     await Promise.all([
       sb.from("tenant_processes").select("*").in("tenant_id", ids),
@@ -411,7 +414,7 @@ async function loadAllTenants(): Promise<Tenant[]> {
 }
 
 export async function getDb(): Promise<DbShape> {
-  if (!useRemote()) return fileStore.getDb();
+  if (!isRemoteDb()) return fileStore.getDb();
   const sb = getSupabaseAdmin();
   const [
     tenants,
@@ -465,14 +468,14 @@ export async function getDb(): Promise<DbShape> {
 }
 
 export async function getTenantById(id: string): Promise<Tenant | null> {
-  if (!useRemote()) return fileStore.getTenantById(id);
+  if (!isRemoteDb()) return fileStore.getTenantById(id);
   return loadTenantBundle(id);
 }
 
 export async function getTenantByPhoneNumberId(
   phoneNumberId: string,
 ): Promise<Tenant | null> {
-  if (!useRemote()) {
+  if (!isRemoteDb()) {
     const db = await fileStore.getDb();
     return (
       db.tenants.find(
@@ -489,14 +492,15 @@ export async function getTenantByPhoneNumberId(
     .eq("whatsapp_connected", true)
     .maybeSingle();
   if (error) throw error;
-  if (!data) return null;
-  return loadTenantBundle(data.id as string);
+  const phoneRow = data as { id: string } | null;
+  if (!phoneRow) return null;
+  return loadTenantBundle(phoneRow.id);
 }
 
 export async function getConversationById(
   id: string,
 ): Promise<Conversation | null> {
-  if (!useRemote()) {
+  if (!isRemoteDb()) {
     const db = await fileStore.getDb();
     return db.conversations.find((c) => c.id === id) ?? null;
   }
@@ -512,13 +516,13 @@ export async function getConversationById(
 }
 
 export async function getActiveTenant(): Promise<Tenant | null> {
-  if (!useRemote()) return fileStore.getActiveTenant();
+  if (!isRemoteDb()) return fileStore.getActiveTenant();
   const tenants = await loadAllTenants();
   return tenants[0] ?? null;
 }
 
 export async function setActiveTenantId(tenantId: string): Promise<Tenant> {
-  if (!useRemote()) return fileStore.setActiveTenantId(tenantId);
+  if (!isRemoteDb()) return fileStore.setActiveTenantId(tenantId);
   const tenant = await loadTenantBundle(tenantId);
   if (!tenant) throw new Error("Tenant not found");
   return tenant;
@@ -530,7 +534,7 @@ export async function createTenant(input: {
   phone: string;
   vertical: Tenant["vertical"];
 }): Promise<Tenant> {
-  if (!useRemote()) return fileStore.createTenant(input);
+  if (!isRemoteDb()) return fileStore.createTenant(input);
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
     .from("tenants")
@@ -544,7 +548,8 @@ export async function createTenant(input: {
     .select("*")
     .single();
   if (error) throw error;
-  const tenant = await loadTenantBundle(data.id as string);
+  const created = data as { id: string };
+  const tenant = await loadTenantBundle(created.id);
   if (!tenant) throw new Error("Tenant create failed");
   return tenant;
 }
@@ -553,7 +558,7 @@ export async function updateTenant(
   tenantId: string,
   patch: Partial<Tenant>,
 ): Promise<Tenant> {
-  if (!useRemote()) return fileStore.updateTenant(tenantId, patch);
+  if (!isRemoteDb()) return fileStore.updateTenant(tenantId, patch);
   const sb = getSupabaseAdmin();
   const current = await loadTenantBundle(tenantId);
   if (!current) throw new Error("Tenant not found");
@@ -644,7 +649,7 @@ export async function setProcessEnabled(
   key: ProcessKey,
   enabled: boolean,
 ): Promise<Tenant> {
-  if (!useRemote()) return fileStore.setProcessEnabled(tenantId, key, enabled);
+  if (!isRemoteDb()) return fileStore.setProcessEnabled(tenantId, key, enabled);
   const sb = getSupabaseAdmin();
   const { error } = await sb.from("tenant_processes").upsert({
     tenant_id: tenantId,
@@ -698,7 +703,7 @@ export async function getOrCreateConversation(input: {
   customerWaId: string;
   customerName?: string;
 }): Promise<Conversation> {
-  if (!useRemote()) return fileStore.getOrCreateConversation(input);
+  if (!isRemoteDb()) return fileStore.getOrCreateConversation(input);
   const sb = getSupabaseAdmin();
   const { data: existing, error: findErr } = await sb
     .from("conversations")
@@ -732,7 +737,7 @@ export async function updateConversation(
   conversationId: string,
   patch: Partial<Conversation>,
 ): Promise<Conversation> {
-  if (!useRemote()) return fileStore.updateConversation(conversationId, patch);
+  if (!isRemoteDb()) return fileStore.updateConversation(conversationId, patch);
   const sb = getSupabaseAdmin();
   const current = await getConversationById(conversationId);
   if (!current) throw new Error("Conversation not found");
@@ -748,6 +753,10 @@ export async function updateConversation(
   const payment = patch.payment
     ? { ...current.payment, ...patch.payment }
     : current.payment;
+  const agent =
+    patch.agent !== undefined
+      ? { ...(current.agent ?? {}), ...patch.agent }
+      : current.agent ?? {};
 
   const addressFromState =
     typeof processState.address === "string" ? processState.address : null;
@@ -795,6 +804,7 @@ export async function updateConversation(
       payment_link_url: payment?.linkUrl ?? null,
       payment_status: payment?.status ?? "none",
       payment_provider: payment?.provider ?? null,
+      agent,
     })
     .eq("id", conversationId)
     .select("*")
@@ -806,7 +816,7 @@ export async function updateConversation(
 export async function addMessage(
   input: Omit<Message, "id" | "createdAt">,
 ): Promise<Message> {
-  if (!useRemote()) return fileStore.addMessage(input);
+  if (!isRemoteDb()) return fileStore.addMessage(input);
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
     .from("messages")
@@ -828,7 +838,7 @@ export async function addMessage(
 export async function listConversations(tenantId: string): Promise<
   Array<Conversation & { lastMessage?: Message }>
 > {
-  if (!useRemote()) return fileStore.listConversations(tenantId);
+  if (!isRemoteDb()) return fileStore.listConversations(tenantId);
   const sb = getSupabaseAdmin();
   const { data: convRows, error } = await sb
     .from("conversations")
@@ -861,7 +871,7 @@ export async function listConversations(tenantId: string): Promise<
 }
 
 export async function listMessages(conversationId: string): Promise<Message[]> {
-  if (!useRemote()) return fileStore.listMessages(conversationId);
+  if (!isRemoteDb()) return fileStore.listMessages(conversationId);
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
     .from("messages")
@@ -876,7 +886,7 @@ export async function addBusinessEvents(
   events: Array<Omit<BusinessEvent, "id" | "createdAt">>,
 ): Promise<BusinessEvent[]> {
   if (events.length === 0) return [];
-  if (!useRemote()) return fileStore.addBusinessEvents(events);
+  if (!isRemoteDb()) return fileStore.addBusinessEvents(events);
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
     .from("business_events")
@@ -903,7 +913,7 @@ export async function addBusinessEvents(
 export async function listBusinessEvents(
   tenantId: string,
 ): Promise<BusinessEvent[]> {
-  if (!useRemote()) return fileStore.listBusinessEvents(tenantId);
+  if (!isRemoteDb()) return fileStore.listBusinessEvents(tenantId);
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
     .from("business_events")
@@ -920,7 +930,7 @@ export async function listBusinessEvents(
 }
 
 export async function listProspects(): Promise<Prospect[]> {
-  if (!useRemote()) return fileStore.listProspects();
+  if (!isRemoteDb()) return fileStore.listProspects();
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
     .from("prospects")
@@ -938,7 +948,7 @@ export async function listProspects(): Promise<Prospect[]> {
 export async function createProspect(
   input: Omit<Prospect, "id" | "createdAt" | "updatedAt">,
 ): Promise<Prospect> {
-  if (!useRemote()) return fileStore.createProspect(input);
+  if (!isRemoteDb()) return fileStore.createProspect(input);
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
     .from("prospects")
@@ -969,7 +979,7 @@ export async function updateProspect(
   id: string,
   patch: Partial<Omit<Prospect, "id" | "createdAt" | "updatedAt">>,
 ): Promise<Prospect> {
-  if (!useRemote()) return fileStore.updateProspect(id, patch);
+  if (!isRemoteDb()) return fileStore.updateProspect(id, patch);
   const sb = getSupabaseAdmin();
   const row: Record<string, unknown> = {};
   if (patch.businessName !== undefined) row.business_name = patch.businessName;
@@ -1004,7 +1014,7 @@ export async function updateProspect(
 }
 
 export async function deleteProspect(id: string): Promise<void> {
-  if (!useRemote()) return fileStore.deleteProspect(id);
+  if (!isRemoteDb()) return fileStore.deleteProspect(id);
   const sb = getSupabaseAdmin();
   const { error } = await sb.from("prospects").delete().eq("id", id);
   if (error) {
@@ -1052,7 +1062,7 @@ function mapPhone(row: PhoneRow): PhoneNumber {
 }
 
 export async function listPhoneNumbers(): Promise<PhoneNumber[]> {
-  if (!useRemote()) return fileStore.listPhoneNumbers();
+  if (!isRemoteDb()) return fileStore.listPhoneNumbers();
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
     .from("phone_numbers")
@@ -1065,7 +1075,7 @@ export async function listPhoneNumbers(): Promise<PhoneNumber[]> {
 export async function createPhoneNumber(
   input: Omit<PhoneNumber, "id" | "createdAt" | "updatedAt">,
 ): Promise<PhoneNumber> {
-  if (!useRemote()) return fileStore.createPhoneNumber(input);
+  if (!isRemoteDb()) return fileStore.createPhoneNumber(input);
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
     .from("phone_numbers")
@@ -1095,7 +1105,7 @@ export async function updatePhoneNumber(
   id: string,
   patch: Partial<PhoneNumber>,
 ): Promise<PhoneNumber> {
-  if (!useRemote()) return fileStore.updatePhoneNumber(id, patch);
+  if (!isRemoteDb()) return fileStore.updatePhoneNumber(id, patch);
   const sb = getSupabaseAdmin();
   const row: Record<string, unknown> = {};
   if (patch.status !== undefined) row.status = patch.status;
