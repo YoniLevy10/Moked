@@ -694,9 +694,33 @@ export async function connectWhatsAppDemo(tenantId: string): Promise<Tenant> {
   });
 }
 
+type MessageTemplate = import("@/lib/types").MessageTemplate;
+
+function mapTemplateRow(row: Record<string, unknown>): MessageTemplate {
+  return {
+    id: String(row.id),
+    tenantId: String(row.tenant_id),
+    name: String(row.name),
+    language: String(row.language ?? "he"),
+    category: String(row.category ?? "UTILITY"),
+    components: (row.components as unknown[]) ?? [],
+    status:
+      (row.status as "draft" | "pending" | "approved" | "rejected") ??
+      "pending",
+    metaId: row.meta_id ? String(row.meta_id) : undefined,
+    rejectionReason: row.rejection_reason
+      ? String(row.rejection_reason)
+      : undefined,
+    submittedAt: row.submitted_at ? String(row.submitted_at) : undefined,
+    approvedAt: row.approved_at ? String(row.approved_at) : undefined,
+    createdAt: String(row.created_at ?? new Date().toISOString()),
+    updatedAt: String(row.updated_at ?? new Date().toISOString()),
+  };
+}
+
 export async function listTemplatesForTenant(
   tenantId: string,
-): Promise<import("@/lib/types").MessageTemplate[]> {
+): Promise<MessageTemplate[]> {
   if (!isRemoteDb()) return fileStore.listTemplatesForTenant(tenantId);
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
@@ -707,23 +731,106 @@ export async function listTemplatesForTenant(
     if (/templates|relation|does not exist/i.test(error.message)) return [];
     throw error;
   }
-  return ((data ?? []) as Array<Record<string, unknown>>).map((row) => ({
-    id: String(row.id),
-    tenantId: String(row.tenant_id),
-    name: String(row.name),
-    language: String(row.language ?? "he"),
-    category: String(row.category ?? "UTILITY"),
-    components: (row.components as unknown[]) ?? [],
-    status: (row.status as "draft" | "pending" | "approved" | "rejected") ?? "pending",
-    metaId: row.meta_id ? String(row.meta_id) : undefined,
-    rejectionReason: row.rejection_reason
-      ? String(row.rejection_reason)
-      : undefined,
-    submittedAt: row.submitted_at ? String(row.submitted_at) : undefined,
-    approvedAt: row.approved_at ? String(row.approved_at) : undefined,
-    createdAt: String(row.created_at ?? new Date().toISOString()),
-    updatedAt: String(row.updated_at ?? new Date().toISOString()),
-  }));
+  return ((data ?? []) as Array<Record<string, unknown>>).map(mapTemplateRow);
+}
+
+export async function upsertTemplate(input: {
+  id?: string;
+  tenantId: string;
+  name: string;
+  language: string;
+  category: string;
+  components: unknown[];
+  status: MessageTemplate["status"];
+  metaId?: string;
+  rejectionReason?: string;
+  submittedAt?: string;
+  approvedAt?: string;
+}): Promise<MessageTemplate> {
+  if (!isRemoteDb()) return fileStore.upsertTemplate(input);
+  const sb = getSupabaseAdmin();
+  const now = new Date().toISOString();
+  if (input.id) {
+    const { data, error } = await sb
+      .from("templates")
+      .update({
+        name: input.name,
+        language: input.language,
+        category: input.category,
+        components: input.components,
+        status: input.status,
+        meta_id: input.metaId ?? null,
+        rejection_reason: input.rejectionReason ?? null,
+        submitted_at: input.submittedAt ?? null,
+        approved_at: input.approvedAt ?? null,
+        updated_at: now,
+      })
+      .eq("id", input.id)
+      .select("*")
+      .single();
+    if (error) throw error;
+    return mapTemplateRow(data as Record<string, unknown>);
+  }
+  const { data, error } = await sb
+    .from("templates")
+    .upsert(
+      {
+        tenant_id: input.tenantId,
+        name: input.name,
+        language: input.language,
+        category: input.category,
+        components: input.components,
+        status: input.status,
+        meta_id: input.metaId ?? null,
+        rejection_reason: input.rejectionReason ?? null,
+        submitted_at: input.submittedAt ?? null,
+        approved_at: input.approvedAt ?? null,
+        updated_at: now,
+      },
+      { onConflict: "tenant_id,name,language" },
+    )
+    .select("*")
+    .single();
+  if (error) throw error;
+  return mapTemplateRow(data as Record<string, unknown>);
+}
+
+export async function applyTemplateStatusUpdate(input: {
+  tenantId: string;
+  metaId?: string;
+  name?: string;
+  language?: string;
+  event?: string;
+  reason?: string;
+}): Promise<MessageTemplate> {
+  if (!isRemoteDb()) return fileStore.applyTemplateStatusUpdate(input);
+  const language = input.language ?? "he";
+  const name = input.name ?? `template_${input.metaId ?? "unknown"}`;
+  const event = (input.event ?? "").toLowerCase();
+  const rejected =
+    event.includes("reject") ||
+    event.includes("disabl") ||
+    event === "rejected";
+  const approved =
+    event.includes("approv") || event === "approved" || event === "active";
+  const status: MessageTemplate["status"] = rejected
+    ? "rejected"
+    : approved
+      ? "approved"
+      : "pending";
+  const now = new Date().toISOString();
+  return upsertTemplate({
+    tenantId: input.tenantId,
+    name,
+    language,
+    category: "UTILITY",
+    components: [],
+    status,
+    metaId: input.metaId,
+    rejectionReason: rejected ? input.reason : undefined,
+    submittedAt: now,
+    approvedAt: approved ? now : undefined,
+  });
 }
 
 export async function connectWhatsAppLive(
