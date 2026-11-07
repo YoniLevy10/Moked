@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { subscriptionPriceIls } from "@/lib/product/model";
+import { subscriptionPriceIls } from "@/lib/product/fees";
 
 const PILOT_WA =
   process.env.NEXT_PUBLIC_PILOT_WHATSAPP || "972548102688";
