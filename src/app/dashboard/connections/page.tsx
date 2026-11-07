@@ -212,55 +212,31 @@ export default function ConnectionsPage() {
         </ul>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-3xl border border-line bg-white/70 p-6">
-          <h2 className="display text-lg font-bold">גל A/B — יומן וביקורות</h2>
-          <p className="mt-2 text-sm text-muted">
-            Google Calendar:{" "}
-            {tenant.integrations.googleCalendar ? "מחובר" : "לא מחובר"}
-          </p>
-          <button
-            className="mt-4 rounded-full border border-line px-4 py-2 text-sm font-medium"
-            onClick={() =>
-              void patchIntegrations({
-                googleCalendar: !tenant.integrations.googleCalendar,
-              })
-            }
-          >
-            הפוך יומן (UI)
-          </button>
-          <p className="mt-3 text-sm text-muted">
-            קישור ביקורות:{" "}
-            {tenant.integrations.googleReviewsUrl ?? "ברירת מחדל / placeholder"}
-          </p>
-        </div>
-
-        <div className="rounded-3xl border border-line bg-white/70 p-6">
-          <h2 className="display text-lg font-bold">גל D — תשלומים (אחרון)</h2>
-          <p className="mt-2 text-sm text-muted">
-            ספק נוכחי: {tenant.integrations.paymentsProvider}
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {(["none", "demo", "grow", "payplus", "tranzila", "cardcom"] as const).map(
-              (p) => (
-                <button
-                  key={p}
-                  onClick={() => void patchIntegrations({ paymentsProvider: p })}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-                    tenant.integrations.paymentsProvider === p
-                      ? "bg-brand text-white"
-                      : "border border-line"
-                  }`}
-                >
-                  {p}
-                </button>
-              ),
-            )}
-          </div>
-          <p className="mt-4 text-xs text-muted">
-            Webhook מוכן ב־`/api/payments/webhook` לקבלת אישורי סליקה.
-          </p>
-        </div>
+      <section className="rounded-3xl border border-line bg-white/70 p-6">
+        <h2 className="display text-lg font-bold">גל A/B — יומן וביקורות</h2>
+        <p className="mt-2 text-sm text-muted">
+          Google Calendar אופציונלי — תיאום ביקורים עובד גם בלי יומן (חריצי
+          ביקור מובנים). סטטוס:{" "}
+          {tenant.integrations.googleCalendar ? "מחובר" : "לא מחובר"}
+        </p>
+        <button
+          className="mt-4 rounded-full border border-line px-4 py-2 text-sm font-medium"
+          onClick={() =>
+            void patchIntegrations({
+              googleCalendar: !tenant.integrations.googleCalendar,
+            })
+          }
+        >
+          הפוך יומן (UI)
+        </button>
+        <p className="mt-3 text-sm text-muted">
+          קישור ביקורות:{" "}
+          {tenant.integrations.googleReviewsUrl ?? "ברירת מחדל / placeholder"}
+        </p>
+        <p className="mt-4 text-xs text-muted">
+          גביית לקוח קצה (גל D) מוסתרת ב־v1 מאחורי{" "}
+          <code dir="ltr">MOKED_ENABLE_CUSTOMER_PAYMENTS</code>.
+        </p>
       </section>
 
       {msg && <p className="text-sm text-warn">{msg}</p>}
