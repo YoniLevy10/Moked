@@ -5,12 +5,16 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 const VERTICALS = [
-  { id: "clinic", label: "קליניקה / טיפול" },
-  { id: "trades", label: "בעלי מקצוע" },
-  { id: "coach", label: "ייעוץ / אימון" },
-  { id: "beauty", label: "יופי / טיפוח" },
-  { id: "realty", label: "נדל״ן" },
+  { id: "trades", label: "בעלי מקצוע (מומלץ — beachhead)" },
   { id: "other", label: "אחר" },
+] as const;
+
+const TRADE_KINDS = [
+  { id: "plumbing", label: "אינסטלציה" },
+  { id: "electrical", label: "חשמל" },
+  { id: "hvac", label: "מיזוג" },
+  { id: "renovation", label: "שיפוצים" },
+  { id: "handyman", label: "הנדימן" },
 ] as const;
 
 export default function OnboardingPage() {
@@ -23,6 +27,7 @@ export default function OnboardingPage() {
     ownerName: "",
     phone: "",
     vertical: "trades" as (typeof VERTICALS)[number]["id"],
+    tradeKind: "plumbing" as (typeof TRADE_KINDS)[number]["id"],
   });
 
   async function createTenant(e: FormEvent) {
@@ -60,7 +65,10 @@ export default function OnboardingPage() {
       {step === 1 ? (
         <form onSubmit={createTenant} className="animate-rise space-y-5">
           <h1 className="display text-3xl font-bold">הקמת העסק</h1>
-          <p className="text-muted">דקה אחת — ואז מפעילים את המנוי ואת הוראות הבוט.</p>
+          <p className="text-muted">
+            מספר WhatsApp חדש לפרסום / נחיתה — המספר האישי שלכם לא נוגע. דקה אחת
+            ואז מנוי + הוראות בוט.
+          </p>
 
           <label className="block space-y-2">
             <span className="text-sm font-medium">שם העסק</span>
@@ -116,6 +124,28 @@ export default function OnboardingPage() {
               ))}
             </select>
           </label>
+
+          {form.vertical === "trades" && (
+            <label className="block space-y-2">
+              <span className="text-sm font-medium">התמחות</span>
+              <select
+                className="w-full rounded-2xl border border-line bg-white/80 px-4 py-3 outline-none ring-brand focus:ring-2"
+                value={form.tradeKind}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    tradeKind: e.target.value as typeof form.tradeKind,
+                  }))
+                }
+              >
+                {TRADE_KINDS.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
           {error && <p className="text-sm text-danger">{error}</p>}
 

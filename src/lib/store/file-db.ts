@@ -113,10 +113,11 @@ export async function createTenant(input: {
   ownerName: string;
   phone: string;
   vertical: Tenant["vertical"];
+  tradeKind?: string;
 }): Promise<Tenant> {
   const db = await ensureDb();
   const now = new Date().toISOString();
-  const tenant: Tenant = {
+  let tenant: Tenant = {
     id: nanoid(),
     businessName: input.businessName,
     ownerName: input.ownerName,
@@ -148,6 +149,10 @@ export async function createTenant(input: {
     subscription: defaultSubscription(),
     bot: defaultBot(),
   };
+  if (input.vertical === "trades") {
+    const { applyTradesPackToTenant } = await import("@/lib/trades/pack");
+    tenant = applyTradesPackToTenant(tenant, input.tradeKind);
+  }
   db.tenants.push(tenant);
   db.activeTenantId = tenant.id;
   await writeDb(db);

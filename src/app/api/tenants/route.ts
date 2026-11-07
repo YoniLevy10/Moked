@@ -43,6 +43,9 @@ const CreateSchema = z.object({
     "realty",
     "other",
   ]),
+  tradeKind: z
+    .enum(["renovation", "hvac", "electrical", "plumbing", "handyman"])
+    .optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -63,6 +66,10 @@ export async function POST(req: NextRequest) {
 
   const body = CreateSchema.parse(await req.json());
   const tenant = await createTenant(body);
+  if (tenant.vertical === "trades") {
+    const { seedKnowledgeFromTenant } = await import("@/lib/agent/knowledge");
+    await seedKnowledgeFromTenant(tenant, body.tradeKind);
+  }
   await linkUserToTenant(user.id, tenant.id);
   // Refresh cookie role/tenant by re-setting session with updated tenantId
   await setSessionCookie({ ...user, tenantId: tenant.id });

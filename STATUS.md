@@ -67,6 +67,7 @@
 | Readiness | demo-relaxed / live-strict gate | ✅ |
 | Escalation | ממתין לאדם + notify ≤2 | ✅ |
 | Templates | Hebrew utility lifecycle + channel send | ✅ |
+| Trades pack | knowledge + slot scheduler (no calendar) | ✅ |
 | Auth + מחיצות משטחים | — | ✅ |
 | Meta Embedded Signup | — | ✅ קוד מוכן (דורש credentials) |
 | **Postgres (Supabase)** | `pgsmselyieizacwdsdjl` | ✅ סכמה + חיבור קוד |

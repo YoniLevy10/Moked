@@ -160,11 +160,16 @@ export async function upsertTenantKnowledge(
   };
 }
 
-/** Ensure pricing + bot.answers are mirrored into tenant_knowledge. */
+/** Ensure pricing + bot.answers (+ trades pack FAQ) are mirrored into tenant_knowledge. */
 export async function seedKnowledgeFromTenant(
   tenant: Tenant,
+  tradeKind?: string | null,
 ): Promise<TenantKnowledgeRow[]> {
   const rows = knowledgeFromTenant(tenant);
+  if (tenant.vertical === "trades") {
+    const { tradesKnowledgeRows } = await import("@/lib/trades/pack");
+    rows.push(...tradesKnowledgeRows(tenant.id, tradeKind));
+  }
   const saved: TenantKnowledgeRow[] = [];
   for (const row of rows) {
     saved.push(await upsertTenantKnowledge(row));
