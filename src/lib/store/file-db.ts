@@ -232,6 +232,128 @@ export async function listTemplatesForTenant(
   return db.templates.filter((t) => t.tenantId === tenantId);
 }
 
+export async function upsertTemplate(input: {
+  id?: string;
+  tenantId: string;
+  name: string;
+  language: string;
+  category: string;
+  components: unknown[];
+  status: MessageTemplate["status"];
+  metaId?: string;
+  rejectionReason?: string;
+  submittedAt?: string;
+  approvedAt?: string;
+}): Promise<MessageTemplate> {
+  const db = await ensureDb();
+  const now = new Date().toISOString();
+  const idx = db.templates.findIndex(
+    (t) =>
+      (input.id && t.id === input.id) ||
+      (t.tenantId === input.tenantId &&
+        t.name === input.name &&
+        t.language === input.language),
+  );
+  if (idx >= 0) {
+    db.templates[idx] = {
+      ...db.templates[idx],
+      ...input,
+      metaId: input.metaId ?? db.templates[idx].metaId,
+      rejectionReason: input.rejectionReason,
+      submittedAt: input.submittedAt ?? db.templates[idx].submittedAt,
+      approvedAt: input.approvedAt ?? db.templates[idx].approvedAt,
+      updatedAt: now,
+    };
+    await writeDb(db);
+    return db.templates[idx];
+  }
+  const row: MessageTemplate = {
+    id: input.id ?? nanoid(),
+    tenantId: input.tenantId,
+    name: input.name,
+    language: input.language,
+    category: input.category,
+    components: input.components,
+    status: input.status,
+    metaId: input.metaId,
+    rejectionReason: input.rejectionReason,
+    submittedAt: input.submittedAt,
+    approvedAt: input.approvedAt,
+    createdAt: now,
+    updatedAt: now,
+  };
+  db.templates.push(row);
+  await writeDb(db);
+  return row;
+}
+
+export async function applyTemplateStatusUpdate(input: {
+  tenantId: string;
+  metaId?: string;
+  name?: string;
+  language?: string;
+  event?: string;
+  reason?: string;
+}): Promise<MessageTemplate> {
+  const db = await ensureDb();
+  const language = input.language ?? "he";
+  const name = input.name ?? `template_${input.metaId ?? "unknown"}`;
+  const event = (input.event ?? "").toLowerCase();
+  const rejected =
+    event.includes("reject") ||
+    event.includes("disabl") ||
+    event === "rejected";
+  const approved =
+    event.includes("approv") || event === "approved" || event === "active";
+  const status: MessageTemplate["status"] = rejected
+    ? "rejected"
+    : approved
+      ? "approved"
+      : "pending";
+  const now = new Date().toISOString();
+
+  const idx = db.templates.findIndex(
+    (t) =>
+      t.tenantId === input.tenantId &&
+      ((input.metaId && t.metaId === input.metaId) ||
+        (t.name === name && t.language === language)),
+  );
+
+  if (idx >= 0) {
+    db.templates[idx] = {
+      ...db.templates[idx],
+      status,
+      metaId: input.metaId ?? db.templates[idx].metaId,
+      rejectionReason: rejected
+        ? (input.reason ?? db.templates[idx].rejectionReason)
+        : undefined,
+      approvedAt: approved ? now : db.templates[idx].approvedAt,
+      updatedAt: now,
+    };
+    await writeDb(db);
+    return db.templates[idx];
+  }
+
+  const row: MessageTemplate = {
+    id: nanoid(),
+    tenantId: input.tenantId,
+    name,
+    language,
+    category: "UTILITY",
+    components: [],
+    status,
+    metaId: input.metaId,
+    rejectionReason: rejected ? input.reason : undefined,
+    submittedAt: now,
+    approvedAt: approved ? now : undefined,
+    createdAt: now,
+    updatedAt: now,
+  };
+  db.templates.push(row);
+  await writeDb(db);
+  return row;
+}
+
 export async function connectWhatsAppLive(
   tenantId: string,
   input: {

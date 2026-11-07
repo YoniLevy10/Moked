@@ -61,6 +61,73 @@ export async function sendWhatsAppText(input: {
   return { ok: true, id: data.messages?.[0]?.id };
 }
 
+/** Send an approved Meta Message Template (live) or labelled demo text fallback. */
+export async function sendWhatsAppTemplate(input: {
+  tenant: Tenant;
+  to: string;
+  templateName: string;
+  language?: string;
+  bodyParameters?: string[];
+  /** Demo fallback body when templates are not live-approved. */
+  fallbackBody: string;
+}): Promise<{ ok: boolean; id?: string; demo?: boolean; usedTemplate: boolean }> {
+  if (!isLiveWhatsApp(input.tenant)) {
+    return {
+      ok: true,
+      demo: true,
+      id: `demo_tpl_${Date.now()}`,
+      usedTemplate: false,
+    };
+  }
+
+  const phoneNumberId = input.tenant.whatsapp.phoneNumberId;
+  const token = getWhatsAppToken(input.tenant);
+  if (!phoneNumberId || !token) throw new Error("Missing live WhatsApp credentials");
+
+  const components =
+    input.bodyParameters && input.bodyParameters.length > 0
+      ? [
+          {
+            type: "body",
+            parameters: input.bodyParameters.map((text) => ({
+              type: "text",
+              text,
+            })),
+          },
+        ]
+      : [];
+
+  const res = await fetch(`${GRAPH}/${phoneNumberId}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to: input.to.replace(/\D/g, ""),
+      type: "template",
+      template: {
+        name: input.templateName,
+        language: { code: input.language ?? "he" },
+        components,
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    // Fall back to plain text if template send fails.
+    const text = await sendWhatsAppText({
+      tenant: input.tenant,
+      to: input.to,
+      body: input.fallbackBody,
+    });
+    return { ...text, usedTemplate: false };
+  }
+  const data = (await res.json()) as { messages?: Array<{ id: string }> };
+  return { ok: true, id: data.messages?.[0]?.id, usedTemplate: true };
+}
+
 export function getEmbeddedSignupConfig() {
   return {
     appId: process.env.META_APP_ID ?? "",
@@ -75,12 +142,25 @@ export function getEmbeddedSignupConfig() {
 }
 
 /** Verify Meta X-Hub-Signature-256 when META_APP_SECRET is set. */
+/**
+ * Meta webhook signature check.
+ * Live (`MOKED_PROVIDER_MODE=live`): fail-closed without META_APP_SECRET.
+ * Explicit local bypass: `MOKED_META_SIGNATURE_BYPASS=1` (never in production).
+ * Demo without secret: soft-open for local smoke (legacy).
+ */
 export function verifyMetaSignature(
   rawBody: string,
   signatureHeader: string | null,
 ): boolean {
-  const secret = process.env.META_APP_SECRET;
-  if (!secret) return true; // soft-open in local/dev without secret
+  if (process.env.MOKED_META_SIGNATURE_BYPASS === "1") return true;
+
+  const secret = process.env.META_APP_SECRET?.trim();
+  const live = process.env.MOKED_PROVIDER_MODE?.trim() === "live";
+
+  if (!secret) {
+    // Fail closed in live; soft-open only outside live for local demo.
+    return !live;
+  }
   if (!signatureHeader?.startsWith("sha256=")) return false;
   const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
   const provided = signatureHeader.slice("sha256=".length);

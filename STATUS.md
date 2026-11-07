@@ -66,6 +66,7 @@
 | Agent | classify + grounding + eval | ✅ |
 | Readiness | demo-relaxed / live-strict gate | ✅ |
 | Escalation | ממתין לאדם + notify ≤2 | ✅ |
+| Templates | Hebrew utility lifecycle + channel send | ✅ |
 | Auth + מחיצות משטחים | — | ✅ |
 | Meta Embedded Signup | — | ✅ קוד מוכן (דורש credentials) |
 | **Postgres (Supabase)** | `pgsmselyieizacwdsdjl` | ✅ סכמה + חיבור קוד |

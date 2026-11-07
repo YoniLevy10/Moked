@@ -1,6 +1,11 @@
+import path from "path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Pin the app root so the nested apps/landing lockfile cannot steal Turbopack's workspace root.
+  turbopack: {
+    root: path.join(__dirname),
+  },
   async headers() {
     const securityHeaders = [
       { key: "X-Content-Type-Options", value: "nosniff" },
