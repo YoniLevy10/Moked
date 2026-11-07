@@ -535,6 +535,7 @@ export async function createTenant(input: {
   ownerName: string;
   phone: string;
   vertical: Tenant["vertical"];
+  tradeKind?: string;
 }): Promise<Tenant> {
   if (!isRemoteDb()) return fileStore.createTenant(input);
   const sb = getSupabaseAdmin();
@@ -551,8 +552,18 @@ export async function createTenant(input: {
     .single();
   if (error) throw error;
   const created = data as { id: string };
-  const tenant = await loadTenantBundle(created.id);
+  let tenant = await loadTenantBundle(created.id);
   if (!tenant) throw new Error("Tenant create failed");
+  if (input.vertical === "trades") {
+    const { applyTradesPackToTenant } = await import("@/lib/trades/pack");
+    const packed = applyTradesPackToTenant(tenant, input.tradeKind);
+    tenant = await updateTenant(tenant.id, {
+      processes: packed.processes,
+      pricing: packed.pricing,
+      bot: packed.bot,
+      integrations: packed.integrations,
+    });
+  }
   return tenant;
 }
 
@@ -638,6 +649,22 @@ export async function updateTenant(
         config: conf.config ?? {},
       });
       if (pErr) throw pErr;
+    }
+  }
+
+  if (patch.pricing) {
+    await sb.from("pricing_items").delete().eq("tenant_id", tenantId);
+    if (patch.pricing.length > 0) {
+      const { error: priceErr } = await sb.from("pricing_items").insert(
+        patch.pricing.map((p) => ({
+          id: p.id,
+          tenant_id: tenantId,
+          name: p.name,
+          price_ils: p.priceIls,
+          description: p.description ?? null,
+        })),
+      );
+      if (priceErr) throw priceErr;
     }
   }
 
