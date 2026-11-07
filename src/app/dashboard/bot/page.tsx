@@ -12,6 +12,8 @@ type View = {
   billingConnected: boolean;
 };
 
+type Readiness = { ready: boolean };
+
 const STATUS_LABEL: Record<Subscription["status"], string> = {
   inactive: "לא הופעל",
   pending: "ממתין לאישור גבייה",
@@ -30,13 +32,17 @@ function wishFrom(answers: BotAnswers): string {
 export default function BotPage() {
   const router = useRouter();
   const [view, setView] = useState<View | null>(null);
+  const [readiness, setReadiness] = useState<Readiness | null>(null);
   const [wish, setWish] = useState("");
   const [polished, setPolished] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function refresh() {
-    const res = await fetch("/api/billing/checkout");
+    const [res, readyRes] = await Promise.all([
+      fetch("/api/billing/checkout"),
+      fetch("/api/tenants/readiness"),
+    ]);
     const data = await res.json();
     if (!res.ok) {
       setError(data.message ?? data.error ?? "שגיאה");
@@ -45,6 +51,9 @@ export default function BotPage() {
     setView(data);
     setWish(wishFrom(data.bot.answers));
     setPolished(data.bot.draft ?? "");
+    if (readyRes.ok) {
+      setReadiness((await readyRes.json()) as Readiness);
+    }
   }
 
   useEffect(() => {
@@ -109,6 +118,7 @@ export default function BotPage() {
   if (!view) return <p className="text-sm text-muted">טוען…</p>;
 
   const live =
+    readiness?.ready === true &&
     view.subscription.status === "active" &&
     Boolean(view.bot.approved) &&
     view.number?.status === "live";
@@ -130,7 +140,9 @@ export default function BotPage() {
         <p className="sm:col-span-3 text-sm text-muted">
           {live
             ? `הבוט חי על ${view.number?.national}`
-            : "הבוט עדיין לא באוויר. גבייה ומאגר המספרים מתחברים בנפרד."}
+            : readiness?.ready === false
+              ? "לא מסמנים «חי» — יש שלב חוסם ברשימת המוכנות."
+              : "הבוט עדיין לא באוויר. גבייה ומאגר המספרים מתחברים בנפרד."}
         </p>
       </section>
 
