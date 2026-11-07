@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { subscriptionPriceIls } from "@/lib/product/model";
 
 const PILOT_WA =
   process.env.NEXT_PUBLIC_PILOT_WHATSAPP || "972548102688";
@@ -19,6 +20,7 @@ const FIELDS = [
 type Visitor = { name: string; field: string; skip?: boolean };
 
 export function LandingGate() {
+  const subscriptionIls = subscriptionPriceIls();
   const [visitor, setVisitor] = useState<Visitor | null>(null);
   const [name, setName] = useState("");
   const [field, setField] = useState<(typeof FIELDS)[number] | "">("");
@@ -158,7 +160,7 @@ export function LandingGate() {
 
         <div className="actions">
           <Link className="cta" href="/login?next=/onboarding">
-            פותחים מנוי — 249 ₪ לחודש
+            פותחים מנוי — {subscriptionIls} ₪ לחודש
           </Link>
           <a
             className="cta secondary"
