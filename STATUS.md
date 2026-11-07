@@ -63,7 +63,8 @@
 | B | Reminders + Retention | ✅ |
 | C | Quote (+ הנחה אנושית) | ✅ |
 | D | Payment (`demo`) | ⏸ מוסתר ב־v1 (`MOKED_ENABLE_CUSTOMER_PAYMENTS`) |
-| Agent | classify + grounding + eval | 🚧 |
+| Agent | classify + grounding + eval | ✅ |
+| Readiness | demo-relaxed / live-strict gate | ✅ |
 | Auth + מחיצות משטחים | — | ✅ |
 | Meta Embedded Signup | — | ✅ קוד מוכן (דורש credentials) |
 | **Postgres (Supabase)** | `pgsmselyieizacwdsdjl` | ✅ סכמה + חיבור קוד |

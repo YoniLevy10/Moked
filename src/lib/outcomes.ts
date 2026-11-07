@@ -42,6 +42,7 @@ export const BusinessEventTypeSchema = z.enum([
   "agent.grounded_reply",
   "agent.clarify",
   "agent.opt_out",
+  "tenant.blocked",
 ]);
 
 export type BusinessEventType = z.infer<typeof BusinessEventTypeSchema>;
