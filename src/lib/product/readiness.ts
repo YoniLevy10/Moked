@@ -156,9 +156,9 @@ export async function evaluateReadiness(
     labelHe: "תבניות מאושרות",
     ok: templatesOk(templates, tenant),
     blocking: needTemplates,
-    fixHref: "/dashboard/connections",
+    fixHref: "/dashboard/connections#templates",
     detail: needTemplates
-      ? "נדרש כשתזכורות/שימור מופעלים"
+      ? "נדרש כשתזכורות/שימור מופעלים — שלחו תבניות לאישור בחיבורים"
       : "לא חוסם — תהליכי תבנית כבויים",
   });
 

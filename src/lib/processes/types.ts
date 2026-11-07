@@ -10,6 +10,8 @@ export type OutboundAction = {
   body: string;
   type?: "text" | "template" | "interactive";
   processKey: ProcessKey;
+  templateName?: string;
+  templateParams?: string[];
 };
 
 export type ProcessResult = {

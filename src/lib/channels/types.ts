@@ -9,6 +9,9 @@ export type ChannelSendInput = {
   to: string;
   body: string;
   type?: "text" | "template" | "interactive";
+  /** Meta Message Template name when type=template and approved. */
+  templateName?: string;
+  templateParams?: string[];
 };
 
 export type ChannelSendResult = {
