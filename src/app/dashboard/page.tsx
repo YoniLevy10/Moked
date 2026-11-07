@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PROCESS_CATALOG, ProcessKey, Tenant } from "@/lib/types";
-import type { OutcomeMetrics } from "@/lib/outcomes";
+import type { FourNumbers } from "@/lib/outcomes";
+import { tenantShowsDemoDataBadge } from "@/lib/outcomes";
 import { ReadinessChecklist } from "@/components/dashboard/ReadinessChecklist";
 
 type Status = {
@@ -21,7 +22,16 @@ type SimStep = {
 };
 
 type OutcomesResponse = {
-  outcomes: OutcomeMetrics;
+  outcomes: {
+    inquiriesReceived?: number;
+    answeredUnder1Min?: number;
+    visitsScheduled?: number;
+    bookedValueIls?: number;
+  };
+  fourNumbers?: FourNumbers;
+  /** Always tenant_records — never hardcoded showcase figures. */
+  source?: "tenant_records";
+  demoData?: boolean;
   recentEvents: Array<{
     id: string;
     eventType: string;
@@ -55,7 +65,8 @@ function formatIls(n: number) {
 export default function DashboardHome() {
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
-  const [outcomes, setOutcomes] = useState<OutcomeMetrics | null>(null);
+  const [fourNumbers, setFourNumbers] = useState<FourNumbers | null>(null);
+  const [demoData, setDemoData] = useState(false);
   const [recentEvents, setRecentEvents] = useState<
     OutcomesResponse["recentEvents"]
   >([]);
@@ -69,7 +80,15 @@ export default function DashboardHome() {
     const res = await fetch("/api/outcomes");
     if (!res.ok) return;
     const data = (await res.json()) as OutcomesResponse;
-    setOutcomes(data.outcomes);
+    setFourNumbers(
+      data.fourNumbers ?? {
+        inquiriesReceived: data.outcomes?.inquiriesReceived ?? 0,
+        answeredUnder1Min: data.outcomes?.answeredUnder1Min ?? 0,
+        visitsScheduled: data.outcomes?.visitsScheduled ?? 0,
+        bookedValueIls: data.outcomes?.bookedValueIls ?? 0,
+      },
+    );
+    setDemoData(Boolean(data.demoData));
     setRecentEvents(data.recentEvents ?? []);
   }
 
@@ -195,47 +214,57 @@ export default function DashboardHome() {
     (a, b) => a.order - b.order,
   );
 
-  const kpiCards: Array<{
+  /** Beachhead: one screen — four numbers from tenant business_events only. */
+  const numbers = fourNumbers ?? {
+    inquiriesReceived: 0,
+    answeredUnder1Min: 0,
+    visitsScheduled: 0,
+    bookedValueIls: 0,
+  };
+  const showDemoBadge =
+    demoData || tenantShowsDemoDataBadge(tenant);
+  const fourCards: Array<{
     label: string;
     value: string;
     hint: string;
   }> = [
     {
-      label: "לידים שנוצרו",
-      value: String(outcomes?.leadsCreated ?? 0),
-      hint: "פניות שהפכו לליד",
+      label: "פניות שהתקבלו",
+      value: String(numbers.inquiriesReceived),
+      hint: "לידים שנכנסו למספר החדש",
     },
     {
-      label: "לידים שסוננו",
-      value: String(outcomes?.leadsQualified ?? 0),
-      hint: `${outcomes?.leadsHot ?? 0} חמים`,
+      label: "נענו תוך דקה",
+      value: String(numbers.answeredUnder1Min),
+      hint: "מענה ראשון מתחת ל־60 שניות",
     },
     {
-      label: "תורים שנקבעו",
-      value: String(outcomes?.appointmentsBooked ?? 0),
-      hint: "סגירות מועד",
+      label: "ביקורים שתוזמנו",
+      value: String(numbers.visitsScheduled),
+      hint: "תורים שנקבעו",
     },
     {
-      label: "הצעות שאושרו",
-      value: String(outcomes?.quotesAccepted ?? 0),
-      hint: "המרה להצעה",
-    },
-    {
-      label: "הכנסות",
-      value: formatIls(outcomes?.revenueIls ?? 0),
-      hint: `${outcomes?.paymentsCollected ?? 0} תשלומים`,
-    },
-    {
-      label: "לקוחות שחזרו",
-      value: String(outcomes?.customersReturned ?? 0),
-      hint: `${outcomes?.reviewsRequested ?? 0} בקשות ביקורת`,
+      label: "ערך שהוזמן",
+      value: formatIls(numbers.bookedValueIls),
+      hint: "סכום הצעות שאושרו",
     },
   ];
 
   return (
     <div className="space-y-8">
       <section className="animate-rise">
-        <p className="text-sm font-medium text-brand">תוצאות עסקיות</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-sm font-medium text-brand">ארבעה מספרים</p>
+          {showDemoBadge ? (
+            <span
+              role="status"
+              aria-label="Demo data"
+              className="inline-flex items-center rounded-md border border-amber-600/40 bg-amber-100 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-amber-950"
+            >
+              Demo data · נתוני דמו
+            </span>
+          ) : null}
+        </div>
         <h1 className="display mt-1 text-3xl font-bold sm:text-4xl">
           {tenant.businessName}
         </h1>
@@ -260,15 +289,20 @@ export default function DashboardHome() {
 
       <ReadinessChecklist />
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {kpiCards.map((card) => (
+      <section
+        className="grid gap-4 sm:grid-cols-2"
+        aria-label="Four beachhead numbers from tenant records"
+        data-source="tenant_records"
+        data-demo={showDemoBadge ? "true" : "false"}
+      >
+        {fourCards.map((card) => (
           <div
             key={card.label}
-            className="rounded-3xl border border-line bg-white/70 p-5"
+            className="rounded-3xl border border-line bg-white/70 p-6"
           >
             <div className="text-sm font-semibold text-brand">{card.label}</div>
-            <div className="mt-2 display text-3xl font-bold">{card.value}</div>
-            <div className="mt-1 text-sm text-muted">{card.hint}</div>
+            <div className="mt-3 display text-4xl font-bold">{card.value}</div>
+            <div className="mt-2 text-sm text-muted">{card.hint}</div>
           </div>
         ))}
       </section>
