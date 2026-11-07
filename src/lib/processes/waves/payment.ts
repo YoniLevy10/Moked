@@ -1,7 +1,21 @@
 import { ProcessContext, ProcessResult } from "@/lib/processes/types";
 import { createPaymentLink } from "@/lib/integrations/payments";
+import { customerPaymentsEnabled } from "@/lib/product/flags";
 
 export function handlePayment(ctx: ProcessContext): ProcessResult {
+  if (!customerPaymentsEnabled()) {
+    return {
+      handled: true,
+      replies: [
+        {
+          body: "גביית לקוח קצה עדיין לא פעילה בגרסה זו. נמשיך עם תיאום ביקור והצעת מחיר.",
+          processKey: "payment",
+        },
+      ],
+      events: ["payment.blocked_no_provider"],
+    };
+  }
+
   const amount =
     ctx.conversation.quote?.amountIls ??
     ctx.tenant.pricing[0]?.priceIls ??

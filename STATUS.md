@@ -62,7 +62,7 @@
 | A | Intake → Qualification → Booking+כתובת | ✅ |
 | B | Reminders + Retention | ✅ |
 | C | Quote (+ הנחה אנושית) | ✅ |
-| D | Payment (`demo`) | ⏸ מוסתר ב־v1 (`MOKED_ENABLE_CUSTOMER_PAYMENTS`) |
+| D | Payment (`demo`) | ⏸ מוסתר ב־v1 — UI + engine gated (`MOKED_ENABLE_CUSTOMER_PAYMENTS=false`) |
 | Agent | classify + grounding + eval | ✅ |
 | Readiness | demo-relaxed / live-strict gate | ✅ |
 | Escalation | ממתין לאדם + notify ≤2 | ✅ |

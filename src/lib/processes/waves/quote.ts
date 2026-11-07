@@ -113,7 +113,7 @@ export function handleQuote(ctx: ProcessContext): ProcessResult {
       {
         body: paymentEnabled
           ? `נהדר! בחרת "${item.name}" ב־₪${item.priceIls}. ממשיכים לגבייה.`
-          : `נהדר! בחרת "${item.name}" ב־₪${item.priceIls}.\nאפשר להפעיל גל D (גבייה) ממסך התהליכים.`,
+          : `נהדר! בחרת "${item.name}" ב־₪${item.priceIls}.\nנשמח לתאם את הביקור או לענות על שאלות נוספות.`,
         processKey: "quote",
       },
     ],
