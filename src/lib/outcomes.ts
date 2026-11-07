@@ -71,6 +71,11 @@ export type OutcomeMetrics = {
   customersReturned: number;
   reviewsRequested: number;
   referralsAccepted: number;
+  /** Beachhead four-number screen */
+  inquiriesReceived: number;
+  answeredUnder1Min: number;
+  visitsScheduled: number;
+  bookedValueIls: number;
 };
 
 export function emptyOutcomeMetrics(): OutcomeMetrics {
@@ -85,17 +90,35 @@ export function emptyOutcomeMetrics(): OutcomeMetrics {
     customersReturned: 0,
     reviewsRequested: 0,
     referralsAccepted: 0,
+    inquiriesReceived: 0,
+    answeredUnder1Min: 0,
+    visitsScheduled: 0,
+    bookedValueIls: 0,
   };
 }
 
 export function aggregateOutcomes(
-  events: Array<Pick<BusinessEvent, "eventType" | "payload">>,
+  events: Array<
+    Pick<BusinessEvent, "eventType" | "payload" | "conversationId"> & {
+      createdAt?: string;
+    }
+  >,
 ): OutcomeMetrics {
   const m = emptyOutcomeMetrics();
+  const leadAt = new Map<string, number>();
   for (const e of events) {
+    const convId =
+      e.conversationId ??
+      (typeof e.payload?.conversationId === "string"
+        ? e.payload.conversationId
+        : undefined);
     switch (e.eventType) {
       case "lead.created":
         m.leadsCreated += 1;
+        m.inquiriesReceived += 1;
+        if (convId && e.createdAt) {
+          leadAt.set(convId, Date.parse(e.createdAt));
+        }
         break;
       case "lead.qualified":
         m.leadsQualified += 1;
@@ -105,10 +128,39 @@ export function aggregateOutcomes(
         break;
       case "booking.confirmed":
         m.appointmentsBooked += 1;
+        m.visitsScheduled += 1;
         break;
-      case "quote.accepted":
+      case "quote.accepted": {
         m.quotesAccepted += 1;
+        const amount = Number(e.payload?.amountIls ?? 0);
+        if (Number.isFinite(amount) && amount > 0) m.bookedValueIls += amount;
         break;
+      }
+      case "quote.sent": {
+        const amount = Number(e.payload?.amountIls ?? 0);
+        if (Number.isFinite(amount) && amount > 0) {
+          // Booked value prefers accepted; fall back to sent quotes already counted
+          // only when accepted hasn't added this conversation — additive on accept only.
+        }
+        break;
+      }
+      case "agent.grounded_reply":
+      case "agent.clarify":
+      case "message.sent":
+      case "intake.completed":
+      case "booking.proposed":
+      case "lead.qualified": {
+        if (convId && leadAt.has(convId)) {
+          const start = leadAt.get(convId)!;
+          const at = e.createdAt ? Date.parse(e.createdAt) : start;
+          const lag = at - start;
+          if (!Number.isFinite(lag) || (lag >= 0 && lag <= 60_000)) {
+            m.answeredUnder1Min += 1;
+            leadAt.delete(convId);
+          }
+        }
+        break;
+      }
       case "payment.paid": {
         m.paymentsCollected += 1;
         const amount = Number(e.payload?.amountIls ?? 0);
@@ -127,4 +179,21 @@ export function aggregateOutcomes(
     }
   }
   return m;
+}
+
+/** The four beachhead numbers — one screen for trades owners. */
+export type FourNumbers = {
+  inquiriesReceived: number;
+  answeredUnder1Min: number;
+  visitsScheduled: number;
+  bookedValueIls: number;
+};
+
+export function fourNumbersFromOutcomes(m: OutcomeMetrics): FourNumbers {
+  return {
+    inquiriesReceived: m.inquiriesReceived,
+    answeredUnder1Min: m.answeredUnder1Min,
+    visitsScheduled: m.visitsScheduled,
+    bookedValueIls: m.bookedValueIls,
+  };
 }
