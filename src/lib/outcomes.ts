@@ -122,6 +122,7 @@ export function aggregateOutcomes(
         break;
       case "lead.qualified":
         m.leadsQualified += 1;
+        countAnsweredUnder1Min(m, leadAt, convId, e.createdAt);
         break;
       case "lead.hot":
         m.leadsHot += 1;
@@ -136,29 +137,12 @@ export function aggregateOutcomes(
         if (Number.isFinite(amount) && amount > 0) m.bookedValueIls += amount;
         break;
       }
-      case "quote.sent": {
-        const amount = Number(e.payload?.amountIls ?? 0);
-        if (Number.isFinite(amount) && amount > 0) {
-          // Booked value prefers accepted; fall back to sent quotes already counted
-          // only when accepted hasn't added this conversation — additive on accept only.
-        }
-        break;
-      }
       case "agent.grounded_reply":
       case "agent.clarify":
       case "message.sent":
       case "intake.completed":
-      case "booking.proposed":
-      case "lead.qualified": {
-        if (convId && leadAt.has(convId)) {
-          const start = leadAt.get(convId)!;
-          const at = e.createdAt ? Date.parse(e.createdAt) : start;
-          const lag = at - start;
-          if (!Number.isFinite(lag) || (lag >= 0 && lag <= 60_000)) {
-            m.answeredUnder1Min += 1;
-            leadAt.delete(convId);
-          }
-        }
+      case "booking.proposed": {
+        countAnsweredUnder1Min(m, leadAt, convId, e.createdAt);
         break;
       }
       case "payment.paid": {
@@ -196,4 +180,34 @@ export function fourNumbersFromOutcomes(m: OutcomeMetrics): FourNumbers {
     visitsScheduled: m.visitsScheduled,
     bookedValueIls: m.bookedValueIls,
   };
+}
+
+/**
+ * Demo tenants must never look live on a sales call.
+ * Badge when WhatsApp channel mode is demo (not Meta live).
+ */
+export function tenantShowsDemoDataBadge(tenant: {
+  whatsapp?: { mode?: string };
+}): boolean {
+  return (tenant.whatsapp?.mode ?? "demo") === "demo";
+}
+
+function countAnsweredUnder1Min(
+  m: OutcomeMetrics,
+  leadAt: Map<string, number>,
+  convId: string | undefined,
+  createdAt: string | undefined,
+) {
+  if (!convId || !leadAt.has(convId)) return;
+  const start = leadAt.get(convId)!;
+  const at = createdAt ? Date.parse(createdAt) : NaN;
+  const lag = at - start;
+  if (Number.isFinite(lag) && lag >= 0 && lag <= 60_000) {
+    m.answeredUnder1Min += 1;
+    leadAt.delete(convId);
+  } else if (!Number.isFinite(lag)) {
+    // Missing timestamps: do not invent a sub-minute win from incomplete records.
+  } else {
+    leadAt.delete(convId);
+  }
 }
