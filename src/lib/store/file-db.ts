@@ -4,6 +4,7 @@ import { nanoid } from "nanoid";
 import {
   Conversation,
   Message,
+  MessageTemplate,
   PhoneNumber,
   PROCESS_CATALOG,
   ProcessKey,
@@ -32,6 +33,7 @@ export type DbShape = {
   prospects: Prospect[];
   phoneNumbers: PhoneNumber[];
   webhookEvents: WebhookEventRow[];
+  templates: MessageTemplate[];
   activeTenantId: string | null;
 };
 
@@ -56,6 +58,7 @@ function emptyDb(): DbShape {
     prospects: [],
     phoneNumbers: [],
     webhookEvents: [],
+    templates: [],
     activeTenantId: null,
   };
 }
@@ -73,6 +76,7 @@ async function ensureDb(): Promise<DbShape> {
       prospects: parsed.prospects ?? [],
       phoneNumbers: parsed.phoneNumbers ?? [],
       webhookEvents: parsed.webhookEvents ?? [],
+      templates: parsed.templates ?? [],
     };
   } catch {
     const db = emptyDb();
@@ -474,6 +478,95 @@ export async function claimWebhookEvent(input: {
   });
   await writeDb(db);
   return true;
+}
+
+export async function updateMessageDeliveryByMetaId(input: {
+  metaMessageId: string;
+  deliveredAt?: string;
+  readAt?: string;
+  failedAt?: string;
+  errorCode?: string;
+}): Promise<Message | null> {
+  const db = await ensureDb();
+  const idx = db.messages.findIndex(
+    (m) => m.metaMessageId === input.metaMessageId,
+  );
+  if (idx < 0) return null;
+  const current = db.messages[idx];
+  db.messages[idx] = {
+    ...current,
+    deliveredAt: input.deliveredAt ?? current.deliveredAt,
+    readAt: input.readAt ?? current.readAt,
+    failedAt: input.failedAt ?? current.failedAt,
+    errorCode: input.errorCode ?? current.errorCode,
+  };
+  await writeDb(db);
+  return db.messages[idx];
+}
+
+export async function applyTemplateStatusUpdate(input: {
+  tenantId: string;
+  metaId?: string;
+  name?: string;
+  language?: string;
+  event?: string;
+  reason?: string;
+}): Promise<MessageTemplate> {
+  const db = await ensureDb();
+  const language = input.language ?? "he";
+  const name = input.name ?? `template_${input.metaId ?? "unknown"}`;
+  const event = (input.event ?? "").toLowerCase();
+  const rejected =
+    event.includes("reject") || event.includes("disabl") || event === "rejected";
+  const approved =
+    event.includes("approv") || event === "approved" || event === "active";
+  const status: MessageTemplate["status"] = rejected
+    ? "rejected"
+    : approved
+      ? "approved"
+      : "pending";
+  const now = new Date().toISOString();
+
+  const idx = db.templates.findIndex(
+    (t) =>
+      t.tenantId === input.tenantId &&
+      ((input.metaId && t.metaId === input.metaId) ||
+        (t.name === name && t.language === language)),
+  );
+
+  if (idx >= 0) {
+    db.templates[idx] = {
+      ...db.templates[idx],
+      status,
+      metaId: input.metaId ?? db.templates[idx].metaId,
+      rejectionReason: rejected
+        ? input.reason ?? db.templates[idx].rejectionReason
+        : undefined,
+      approvedAt: approved ? now : db.templates[idx].approvedAt,
+      updatedAt: now,
+    };
+    await writeDb(db);
+    return db.templates[idx];
+  }
+
+  const row: MessageTemplate = {
+    id: nanoid(),
+    tenantId: input.tenantId,
+    name,
+    language,
+    category: "UTILITY",
+    components: [],
+    status,
+    metaId: input.metaId,
+    rejectionReason: rejected ? input.reason : undefined,
+    submittedAt: now,
+    approvedAt: approved ? now : undefined,
+    createdAt: now,
+    updatedAt: now,
+  };
+  db.templates.push(row);
+  await writeDb(db);
+  return row;
 }
 
 export function greetingFor(tenant: Tenant): string {
