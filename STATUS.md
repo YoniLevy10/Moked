@@ -60,6 +60,13 @@ DB: כשיש `SUPABASE_SERVICE_ROLE_KEY` האפליקציה כותבת ל־Supab
 מיגרציית לידים: `supabase/migrations/20260909095800_prospects.sql`
 מיגרציית מנוי: `supabase/migrations/20260909120000_subscription_columns.sql`
 
+### P0.2 — Meta webhook hardening
+
+- `statuses[]` + `message_template_status_update` ב־`webhook.ts`
+- עמודות `delivered_at` / `read_at` / `failed_at` / `error_code` על messages
+- טבלת `templates` דקה לעדכוני סטטוס (P0.5 ישלים submit/seed)
+- Idempotency ב־`webhook_events`; חתימת Meta fail-closed ב־live; `MOKED_META_SIGNATURE_BYPASS=1` ללוקאל בלבד
+
 ### P0.1 — חיוב PSP (ספק-אגנוסטי)
 
 - חוזה: `PspClient` ב־`src/lib/integrations/psp.ts`; בחירה ב־`getPsp()` לפי `MOKED_PROVIDER_MODE` + `MOKED_BILLING_PROVIDER`.

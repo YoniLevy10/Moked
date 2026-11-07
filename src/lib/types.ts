@@ -291,10 +291,33 @@ export const MessageSchema = z.object({
   type: z.enum(["text", "template", "interactive", "system"]).default("text"),
   processKey: ProcessKeySchema.optional(),
   metaMessageId: z.string().optional(),
+  deliveredAt: z.string().optional(),
+  readAt: z.string().optional(),
+  failedAt: z.string().optional(),
+  errorCode: z.string().optional(),
   createdAt: z.string(),
 });
 
 export type Message = z.infer<typeof MessageSchema>;
+
+/** Thin Meta Message Template row (P0.2 home for status; P0.5 fills submit/seed). */
+export const TemplateSchema = z.object({
+  id: z.string(),
+  tenantId: z.string(),
+  name: z.string(),
+  language: z.string().default("he"),
+  category: z.string().default("UTILITY"),
+  components: z.array(z.unknown()).default([]),
+  status: z.enum(["draft", "pending", "approved", "rejected"]).default("pending"),
+  metaId: z.string().optional(),
+  rejectionReason: z.string().optional(),
+  submittedAt: z.string().optional(),
+  approvedAt: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export type MessageTemplate = z.infer<typeof TemplateSchema>;
 
 export const VERTICALS: Record<
   Tenant["vertical"],

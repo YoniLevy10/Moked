@@ -136,7 +136,29 @@ create table public.messages (
   type public.message_type not null default 'text',
   process_key public.process_key,
   meta_message_id text,
+  delivered_at timestamptz,
+  read_at timestamptz,
+  failed_at timestamptz,
+  error_code text,
   created_at timestamptz not null default now()
+);
+
+create table public.templates (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.tenants (id) on delete cascade,
+  name text not null,
+  language text not null default 'he',
+  category text not null default 'UTILITY',
+  components jsonb not null default '[]'::jsonb,
+  status text not null default 'pending'
+    check (status in ('draft', 'pending', 'approved', 'rejected')),
+  meta_id text,
+  rejection_reason text,
+  submitted_at timestamptz,
+  approved_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (tenant_id, name, language)
 );
 
 create index messages_conversation_created_idx

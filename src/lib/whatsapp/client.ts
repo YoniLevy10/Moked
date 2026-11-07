@@ -75,12 +75,25 @@ export function getEmbeddedSignupConfig() {
 }
 
 /** Verify Meta X-Hub-Signature-256 when META_APP_SECRET is set. */
+/**
+ * Meta webhook signature check.
+ * Live (`MOKED_PROVIDER_MODE=live`): fail-closed without META_APP_SECRET.
+ * Explicit local bypass: `MOKED_META_SIGNATURE_BYPASS=1` (never in production).
+ * Demo without secret: soft-open for local smoke (legacy).
+ */
 export function verifyMetaSignature(
   rawBody: string,
   signatureHeader: string | null,
 ): boolean {
-  const secret = process.env.META_APP_SECRET;
-  if (!secret) return true; // soft-open in local/dev without secret
+  if (process.env.MOKED_META_SIGNATURE_BYPASS === "1") return true;
+
+  const secret = process.env.META_APP_SECRET?.trim();
+  const live = process.env.MOKED_PROVIDER_MODE?.trim() === "live";
+
+  if (!secret) {
+    // Fail closed in live; soft-open only outside live for local demo.
+    return !live;
+  }
   if (!signatureHeader?.startsWith("sha256=")) return false;
   const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
   const provided = signatureHeader.slice("sha256=".length);

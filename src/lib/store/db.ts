@@ -2,6 +2,7 @@ import {
   BotAnswers,
   Conversation,
   Message,
+  MessageTemplate,
   PhoneNumber,
   PROCESS_CATALOG,
   ProcessKey,
@@ -112,7 +113,27 @@ type MessageRow = {
   type: Message["type"];
   process_key: ProcessKey | null;
   meta_message_id: string | null;
+  delivered_at?: string | null;
+  read_at?: string | null;
+  failed_at?: string | null;
+  error_code?: string | null;
   created_at: string;
+};
+
+type TemplateRow = {
+  id: string;
+  tenant_id: string;
+  name: string;
+  language: string;
+  category: string;
+  components: unknown[];
+  status: "draft" | "pending" | "approved" | "rejected";
+  meta_id: string | null;
+  rejection_reason: string | null;
+  submitted_at: string | null;
+  approved_at: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 type BusinessEventRow = {
@@ -305,7 +326,29 @@ function mapMessage(row: MessageRow): Message {
     type: row.type,
     processKey: row.process_key ?? undefined,
     metaMessageId: row.meta_message_id ?? undefined,
+    deliveredAt: row.delivered_at ?? undefined,
+    readAt: row.read_at ?? undefined,
+    failedAt: row.failed_at ?? undefined,
+    errorCode: row.error_code ?? undefined,
     createdAt: row.created_at,
+  };
+}
+
+function mapTemplate(row: TemplateRow): MessageTemplate {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    name: row.name,
+    language: row.language,
+    category: row.category,
+    components: Array.isArray(row.components) ? row.components : [],
+    status: row.status,
+    metaId: row.meta_id ?? undefined,
+    rejectionReason: row.rejection_reason ?? undefined,
+    submittedAt: row.submitted_at ?? undefined,
+    approvedAt: row.approved_at ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -1183,6 +1226,115 @@ export async function claimWebhookEvent(input: {
     throw error;
   }
   return true;
+}
+
+export async function updateMessageDeliveryByMetaId(input: {
+  metaMessageId: string;
+  deliveredAt?: string;
+  readAt?: string;
+  failedAt?: string;
+  errorCode?: string;
+}): Promise<Message | null> {
+  if (!isRemoteDb()) return fileStore.updateMessageDeliveryByMetaId(input);
+  const sb = getSupabaseAdmin();
+  const patch: Record<string, unknown> = {};
+  if (input.deliveredAt !== undefined) patch.delivered_at = input.deliveredAt;
+  if (input.readAt !== undefined) patch.read_at = input.readAt;
+  if (input.failedAt !== undefined) patch.failed_at = input.failedAt;
+  if (input.errorCode !== undefined) patch.error_code = input.errorCode;
+  const { data, error } = await sb
+    .from("messages")
+    .update(patch)
+    .eq("meta_message_id", input.metaMessageId)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return mapMessage(data as MessageRow);
+}
+
+export async function applyTemplateStatusUpdate(input: {
+  tenantId: string;
+  metaId?: string;
+  name?: string;
+  language?: string;
+  event?: string;
+  reason?: string;
+}): Promise<MessageTemplate> {
+  if (!isRemoteDb()) return fileStore.applyTemplateStatusUpdate(input);
+  const sb = getSupabaseAdmin();
+  const language = input.language ?? "he";
+  const name = input.name ?? `template_${input.metaId ?? "unknown"}`;
+  const event = (input.event ?? "").toLowerCase();
+  const rejected =
+    event.includes("reject") || event.includes("disabl") || event === "rejected";
+  const approved =
+    event.includes("approv") || event === "approved" || event === "active";
+  const status: MessageTemplate["status"] = rejected
+    ? "rejected"
+    : approved
+      ? "approved"
+      : "pending";
+  const now = new Date().toISOString();
+
+  let existing: TemplateRow | null = null;
+  if (input.metaId) {
+    const { data } = await sb
+      .from("templates")
+      .select("*")
+      .eq("tenant_id", input.tenantId)
+      .eq("meta_id", input.metaId)
+      .maybeSingle();
+    existing = (data as TemplateRow | null) ?? null;
+  }
+  if (!existing) {
+    const { data } = await sb
+      .from("templates")
+      .select("*")
+      .eq("tenant_id", input.tenantId)
+      .eq("name", name)
+      .eq("language", language)
+      .maybeSingle();
+    existing = (data as TemplateRow | null) ?? null;
+  }
+
+  if (existing) {
+    const { data, error } = await sb
+      .from("templates")
+      .update({
+        status,
+        meta_id: input.metaId ?? existing.meta_id,
+        rejection_reason: rejected
+          ? input.reason ?? existing.rejection_reason
+          : null,
+        approved_at: approved ? now : existing.approved_at,
+        updated_at: now,
+      })
+      .eq("id", existing.id)
+      .select("*")
+      .single();
+    if (error) throw error;
+    return mapTemplate(data as TemplateRow);
+  }
+
+  const { data, error } = await sb
+    .from("templates")
+    .insert({
+      tenant_id: input.tenantId,
+      name,
+      language,
+      category: "UTILITY",
+      components: [],
+      status,
+      meta_id: input.metaId ?? null,
+      rejection_reason: rejected ? input.reason ?? null : null,
+      submitted_at: now,
+      approved_at: approved ? now : null,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return mapTemplate(data as TemplateRow);
 }
 
 export function greetingFor(tenant: Tenant): string {
