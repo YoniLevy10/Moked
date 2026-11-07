@@ -29,6 +29,11 @@ import {
   blockingFailures,
   evaluateReadiness,
 } from "@/lib/product/readiness";
+import {
+  escalateConversation,
+  escalationReasonFrom,
+  maybeRenotifyEscalation,
+} from "@/lib/processes/escalation";
 
 function enabled(tenant: Tenant, key: ProcessKey): boolean {
   return Boolean(tenant.processes[key]?.enabled);
@@ -437,10 +442,42 @@ export async function handleInboundMessage(input: {
     }
   }
 
+  // Process-engine escalation loop (owner notify + waiting queue). Agent
+  // escalations already set human_takeover above; this catches process events.
+  if (conversation.status !== "human_takeover") {
+    const reason = escalationReasonFrom({
+      events: result.events,
+      inboundText: input.text,
+      conversation,
+    });
+    if (reason) {
+      const escalated = await escalateConversation({
+        tenant: input.tenant,
+        conversation,
+        reason,
+      });
+      if (escalated) {
+        conversation = escalated;
+        await persistEvents(
+          input.tenant,
+          conversation,
+          ["human.decision_needed"],
+          channel,
+        );
+      }
+    } else if (conversation.escalation && !conversation.escalation.resolvedAt) {
+      const renotified = await maybeRenotifyEscalation({
+        tenant: input.tenant,
+        conversation,
+      });
+      if (renotified) conversation = renotified;
+    }
+  }
+
   return { conversation, result };
 }
 
-async function notifyOwner(input: {
+export async function notifyOwner(input: {
   tenant: Tenant;
   customerWaId: string;
   customerName?: string;

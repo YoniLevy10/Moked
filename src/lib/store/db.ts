@@ -100,6 +100,7 @@ type ConversationRow = {
   payment_provider: string | null;
   payment_external_id: string | null;
   agent?: Conversation["agent"] | null;
+  escalation?: Conversation["escalation"] | null;
   created_at: string;
   updated_at: string;
 };
@@ -290,6 +291,7 @@ function mapConversation(row: ConversationRow): Conversation {
         }
       : undefined,
     agent: row.agent ?? {},
+    escalation: row.escalation ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -805,6 +807,10 @@ export async function updateConversation(
     patch.agent !== undefined
       ? { ...(current.agent ?? {}), ...patch.agent }
       : current.agent ?? {};
+  const escalation =
+    patch.escalation !== undefined
+      ? patch.escalation
+      : current.escalation ?? null;
 
   const addressFromState =
     typeof processState.address === "string" ? processState.address : null;
@@ -853,6 +859,7 @@ export async function updateConversation(
       payment_status: payment?.status ?? "none",
       payment_provider: payment?.provider ?? null,
       agent,
+      escalation,
     })
     .eq("id", conversationId)
     .select("*")

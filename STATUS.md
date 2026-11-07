@@ -65,6 +65,7 @@
 | D | Payment (`demo`) | ⏸ מוסתר ב־v1 (`MOKED_ENABLE_CUSTOMER_PAYMENTS`) |
 | Agent | classify + grounding + eval | ✅ |
 | Readiness | demo-relaxed / live-strict gate | ✅ |
+| Escalation | ממתין לאדם + notify ≤2 | ✅ |
 | Auth + מחיצות משטחים | — | ✅ |
 | Meta Embedded Signup | — | ✅ קוד מוכן (דורש credentials) |
 | **Postgres (Supabase)** | `pgsmselyieizacwdsdjl` | ✅ סכמה + חיבור קוד |

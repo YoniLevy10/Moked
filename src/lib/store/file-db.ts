@@ -312,6 +312,8 @@ export async function updateConversation(
       patch.agent !== undefined
         ? { ...(current.agent ?? {}), ...patch.agent }
         : current.agent ?? {},
+    escalation:
+      patch.escalation !== undefined ? patch.escalation : current.escalation,
     updatedAt: new Date().toISOString(),
   };
   await writeDb(db);
