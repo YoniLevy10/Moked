@@ -60,6 +60,13 @@ DB: כשיש `SUPABASE_SERVICE_ROLE_KEY` האפליקציה כותבת ל־Supab
 מיגרציית לידים: `supabase/migrations/20260909095800_prospects.sql`
 מיגרציית מנוי: `supabase/migrations/20260909120000_subscription_columns.sql`
 
+### P0.4 — Escalation loop
+
+- `conversations.escalation` jsonb + תור **"ממתין לאדם"** באינבוקס
+- הסלמה חד־פעמית (החלטה אנושית / ביטחון נמוך / בקשת אדם / חריגת תשלום·הצעה)
+- notify/re-notify עד 2 ניסיונות (30 דק׳); כיבוד שעות מלבד תשלום
+- השתלטות → `human_takeover`; סיום → `resolve` + החזרה לאוטומציה
+
 ### P0.3 — Readiness gate
 
 - `src/lib/product/readiness.ts` + `GET /api/tenants/readiness` + `POST /api/admin/tenants/[id]/go-live`

@@ -117,12 +117,15 @@ create table public.conversations (
   payment_status public.payment_status not null default 'none',
   payment_provider text,
   payment_external_id text,
+  escalation jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 create index conversations_tenant_updated_idx
   on public.conversations (tenant_id, updated_at desc);
+create index conversations_tenant_status_idx
+  on public.conversations (tenant_id, status);
 create unique index conversations_one_open_per_customer_uidx
   on public.conversations (tenant_id, customer_wa_id)
   where status <> 'closed';

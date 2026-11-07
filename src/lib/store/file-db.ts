@@ -306,6 +306,8 @@ export async function updateConversation(
     payment: patch.payment
       ? { ...current.payment, ...patch.payment }
       : current.payment,
+    escalation:
+      patch.escalation !== undefined ? patch.escalation : current.escalation,
     updatedAt: new Date().toISOString(),
   };
   await writeDb(db);
