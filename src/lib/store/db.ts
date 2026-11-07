@@ -100,6 +100,7 @@ type ConversationRow = {
   payment_status: NonNullable<Conversation["payment"]>["status"];
   payment_provider: string | null;
   payment_external_id: string | null;
+  escalation?: Conversation["escalation"] | null;
   created_at: string;
   updated_at: string;
 };
@@ -311,6 +312,7 @@ function mapConversation(row: ConversationRow): Conversation {
           externalId: row.payment_external_id ?? undefined,
         }
       : undefined,
+    escalation: row.escalation ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -861,6 +863,9 @@ export async function updateConversation(
       payment_status: payment?.status ?? "none",
       payment_provider: payment?.provider ?? null,
       payment_external_id: payment?.externalId ?? null,
+      escalation: patch.escalation !== undefined
+        ? patch.escalation
+        : current.escalation ?? null,
     })
     .eq("id", conversationId)
     .select("*")

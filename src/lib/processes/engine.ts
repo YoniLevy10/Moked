@@ -24,6 +24,11 @@ import {
 import { handleRetention } from "@/lib/processes/waves/retention";
 import { handleQuote } from "@/lib/processes/waves/quote";
 import { handlePayment } from "@/lib/processes/waves/payment";
+import {
+  escalateConversation,
+  escalationReasonFrom,
+  maybeRenotifyEscalation,
+} from "@/lib/processes/escalation";
 import { ProcessResult } from "@/lib/processes/types";
 import { resolveChannel } from "@/lib/channels";
 import { MessagingChannel } from "@/lib/channels/types";
@@ -386,10 +391,39 @@ export async function handleInboundMessage(input: {
     }
   }
 
+  const reason = escalationReasonFrom({
+    events: result.events,
+    inboundText: input.text,
+    conversation,
+  });
+  if (reason) {
+    const escalated = await escalateConversation({
+      tenant: input.tenant,
+      conversation,
+      reason,
+    });
+    if (escalated) {
+      conversation = escalated;
+      await persistEvents(
+        input.tenant,
+        conversation,
+        ["human.decision_needed"],
+        channel,
+      );
+    }
+  } else if (conversation.escalation && !conversation.escalation.resolvedAt) {
+    const renotified = await maybeRenotifyEscalation({
+      tenant: input.tenant,
+      conversation,
+    });
+    if (renotified) conversation = renotified;
+  }
+
   return { conversation, result };
 }
 
-async function notifyOwner(input: {
+/** Existing owner notify for new leads — reused by escalation channel path. */
+export async function notifyOwner(input: {
   tenant: Tenant;
   customerWaId: string;
   customerName?: string;
