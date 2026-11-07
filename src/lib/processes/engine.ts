@@ -256,6 +256,8 @@ async function deliverReplies(input: {
       to: input.to,
       body: reply.body,
       type: reply.type,
+      templateName: reply.templateName,
+      templateParams: reply.templateParams,
     });
     await addMessage({
       conversationId: input.conversation.id,

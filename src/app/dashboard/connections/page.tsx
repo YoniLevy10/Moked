@@ -1,13 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Tenant } from "@/lib/types";
+import { MessageTemplate, Tenant } from "@/lib/types";
 import { EmbeddedSignupButton } from "@/components/whatsapp/EmbeddedSignupButton";
+
+type SeedInfo = { name: string; language: string; category: string; body: string };
 
 export default function ConnectionsPage() {
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<MessageTemplate[]>([]);
+  const [seeds, setSeeds] = useState<SeedInfo[]>([]);
+
+  async function loadTemplates() {
+    const res = await fetch("/api/templates");
+    if (!res.ok) return;
+    const data = await res.json();
+    setTemplates(data.templates ?? []);
+    setSeeds(data.seeds ?? []);
+  }
 
   async function load() {
     const res = await fetch("/api/tenants");
@@ -17,6 +29,19 @@ export default function ConnectionsPage() {
       return;
     }
     setTenant(data.active);
+    await loadTemplates();
+  }
+
+  async function submitAllTemplates() {
+    setError(null);
+    const res = await fetch("/api/templates", { method: "POST" });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error ?? "שליחת תבניות נכשלה");
+      return;
+    }
+    setTemplates(data.templates ?? []);
+    setMsg("תבניות utility בעברית נשלחו לאישור (דמו → pending)");
   }
 
   useEffect(() => {
@@ -128,6 +153,51 @@ export default function ConnectionsPage() {
           <code>META_WEBHOOK_VERIFY_TOKEN</code>
         </div>
         {error && <p className="mt-3 text-sm text-danger">{error}</p>}
+      </section>
+
+      <section className="rounded-3xl border border-line bg-white/70 p-6">
+        <h2 className="display text-xl font-bold">תבניות WhatsApp (עברית · UTILITY)</h2>
+        <p className="mt-2 text-sm text-muted">
+          אישור תבניות נדרש לתזכורות/שימור. בדמו השליחה מדומה; ב־live עם
+          META_TEMPLATE_SUBMIT_ENABLED=1 נשלח ל־Graph.
+        </p>
+        <button
+          type="button"
+          onClick={() => void submitAllTemplates()}
+          className="mt-4 rounded-full bg-brand px-5 py-2.5 font-semibold text-white"
+        >
+          שלח תבניות לאישור
+        </button>
+        <ul className="mt-4 space-y-2 text-sm">
+          {templates.length === 0
+            ? seeds.map((s) => (
+                <li key={s.name} className="flex flex-wrap justify-between gap-2">
+                  <span>
+                    <code>{s.name}</code> · {s.language}
+                  </span>
+                  <span className="text-muted">טרם נשלח</span>
+                </li>
+              ))
+            : templates.map((t) => (
+                <li key={t.id} className="flex flex-wrap justify-between gap-2">
+                  <span>
+                    <code>{t.name}</code> · {t.language}
+                  </span>
+                  <span
+                    className={
+                      t.status === "approved"
+                        ? "text-ok"
+                        : t.status === "rejected"
+                          ? "text-danger"
+                          : "text-muted"
+                    }
+                  >
+                    {t.status}
+                    {t.rejectionReason ? ` — ${t.rejectionReason}` : ""}
+                  </span>
+                </li>
+              ))}
+        </ul>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">

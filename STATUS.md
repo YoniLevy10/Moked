@@ -60,6 +60,14 @@ DB: כשיש `SUPABASE_SERVICE_ROLE_KEY` האפליקציה כותבת ל־Supab
 מיגרציית לידים: `supabase/migrations/20260909095800_prospects.sql`
 מיגרציית מנוי: `supabase/migrations/20260909120000_subscription_columns.sql`
 
+### P0.5 — Template lifecycle
+
+- טבלת `templates` מלאה + seeds עבריים UTILITY (`booking_confirm`, `reminder_t24` עם `{{1}}`)
+- `POST /api/templates/submit`, `GET|POST /api/templates` (רענון pending + שליחה בלחיצה)
+- מוכנות: `templates_approved` חוסם כשתזכורות/שימור מופעלים
+- ערוץ: תזכורות שולחות Meta template כשמאושר; בדמו נשאר טקסט fallback
+- **עדיין נדרש מבעלים:** Meta App + WABA credentials, אישור תבניות ב־Meta Business Manager, `META_TEMPLATE_SUBMIT_ENABLED=1` ל־live
+
 ### P0.4 — Escalation loop
 
 - `conversations.escalation` jsonb + תור **"ממתין לאדם"** באינבוקס

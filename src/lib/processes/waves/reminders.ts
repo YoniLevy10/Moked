@@ -15,7 +15,15 @@ export function buildReminderMessages(
 
   return {
     handled: true,
-    replies: [{ body, type: "template", processKey: "reminders" }],
+    replies: [
+      {
+        body,
+        type: "template",
+        processKey: "reminders",
+        templateName: kind === "t24" ? "reminder_t24" : "booking_confirm",
+        templateParams: [tenant.businessName, String(when)],
+      },
+    ],
     conversationPatch: {
       activeProcess: "reminders",
       booking: {

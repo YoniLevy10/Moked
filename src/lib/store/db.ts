@@ -1289,6 +1289,67 @@ export async function listTemplatesForTenant(
   return ((data ?? []) as TemplateRow[]).map(mapTemplate);
 }
 
+export async function upsertTemplate(input: {
+  id?: string;
+  tenantId: string;
+  name: string;
+  language: string;
+  category: string;
+  components: unknown[];
+  status: MessageTemplate["status"];
+  metaId?: string;
+  rejectionReason?: string;
+  submittedAt?: string;
+  approvedAt?: string;
+}): Promise<MessageTemplate> {
+  if (!isRemoteDb()) return fileStore.upsertTemplate(input);
+  const sb = getSupabaseAdmin();
+  const now = new Date().toISOString();
+  if (input.id) {
+    const { data, error } = await sb
+      .from("templates")
+      .update({
+        name: input.name,
+        language: input.language,
+        category: input.category,
+        components: input.components,
+        status: input.status,
+        meta_id: input.metaId ?? null,
+        rejection_reason: input.rejectionReason ?? null,
+        submitted_at: input.submittedAt ?? null,
+        approved_at: input.approvedAt ?? null,
+        updated_at: now,
+      })
+      .eq("id", input.id)
+      .select("*")
+      .single();
+    if (error) throw error;
+    return mapTemplate(data as TemplateRow);
+  }
+  const { data, error } = await sb
+    .from("templates")
+    .upsert(
+      {
+        tenant_id: input.tenantId,
+        name: input.name,
+        language: input.language,
+        category: input.category,
+        components: input.components,
+        status: input.status,
+        meta_id: input.metaId ?? null,
+        rejection_reason: input.rejectionReason ?? null,
+        submitted_at: input.submittedAt ?? null,
+        approved_at: input.approvedAt ?? null,
+        updated_at: now,
+      },
+      { onConflict: "tenant_id, name, language" },
+    )
+    .select("*")
+    .single();
+  if (error) throw error;
+  return mapTemplate(data as TemplateRow);
+}
+
 export async function applyTemplateStatusUpdate(input: {
   tenantId: string;
   metaId?: string;
