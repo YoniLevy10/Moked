@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PROCESS_CATALOG, ProcessKey, Tenant } from "@/lib/types";
-import type { OutcomeMetrics } from "@/lib/outcomes";
+import type { FourNumbers } from "@/lib/outcomes";
+import { tenantShowsDemoDataBadge } from "@/lib/outcomes";
 import { ReadinessChecklist } from "@/components/dashboard/ReadinessChecklist";
 
 type Status = {
@@ -21,7 +22,16 @@ type SimStep = {
 };
 
 type OutcomesResponse = {
-  outcomes: OutcomeMetrics;
+  outcomes: {
+    inquiriesReceived?: number;
+    answeredUnder1Min?: number;
+    visitsScheduled?: number;
+    bookedValueIls?: number;
+  };
+  fourNumbers?: FourNumbers;
+  /** Always tenant_records — never hardcoded showcase figures. */
+  source?: "tenant_records";
+  demoData?: boolean;
   recentEvents: Array<{
     id: string;
     eventType: string;
@@ -55,7 +65,8 @@ function formatIls(n: number) {
 export default function DashboardHome() {
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
-  const [outcomes, setOutcomes] = useState<OutcomeMetrics | null>(null);
+  const [fourNumbers, setFourNumbers] = useState<FourNumbers | null>(null);
+  const [demoData, setDemoData] = useState(false);
   const [recentEvents, setRecentEvents] = useState<
     OutcomesResponse["recentEvents"]
   >([]);
@@ -69,7 +80,15 @@ export default function DashboardHome() {
     const res = await fetch("/api/outcomes");
     if (!res.ok) return;
     const data = (await res.json()) as OutcomesResponse;
-    setOutcomes(data.outcomes);
+    setFourNumbers(
+      data.fourNumbers ?? {
+        inquiriesReceived: data.outcomes?.inquiriesReceived ?? 0,
+        answeredUnder1Min: data.outcomes?.answeredUnder1Min ?? 0,
+        visitsScheduled: data.outcomes?.visitsScheduled ?? 0,
+        bookedValueIls: data.outcomes?.bookedValueIls ?? 0,
+      },
+    );
+    setDemoData(Boolean(data.demoData));
     setRecentEvents(data.recentEvents ?? []);
   }
 
@@ -195,7 +214,15 @@ export default function DashboardHome() {
     (a, b) => a.order - b.order,
   );
 
-  /** Beachhead: one screen — four numbers only. */
+  /** Beachhead: one screen — four numbers from tenant business_events only. */
+  const numbers = fourNumbers ?? {
+    inquiriesReceived: 0,
+    answeredUnder1Min: 0,
+    visitsScheduled: 0,
+    bookedValueIls: 0,
+  };
+  const showDemoBadge =
+    demoData || tenantShowsDemoDataBadge(tenant);
   const fourCards: Array<{
     label: string;
     value: string;
@@ -203,22 +230,22 @@ export default function DashboardHome() {
   }> = [
     {
       label: "פניות שהתקבלו",
-      value: String(outcomes?.inquiriesReceived ?? outcomes?.leadsCreated ?? 0),
+      value: String(numbers.inquiriesReceived),
       hint: "לידים שנכנסו למספר החדש",
     },
     {
       label: "נענו תוך דקה",
-      value: String(outcomes?.answeredUnder1Min ?? 0),
+      value: String(numbers.answeredUnder1Min),
       hint: "מענה ראשון מתחת ל־60 שניות",
     },
     {
       label: "ביקורים שתוזמנו",
-      value: String(outcomes?.visitsScheduled ?? outcomes?.appointmentsBooked ?? 0),
+      value: String(numbers.visitsScheduled),
       hint: "תורים שנקבעו",
     },
     {
       label: "ערך שהוזמן",
-      value: formatIls(outcomes?.bookedValueIls ?? 0),
+      value: formatIls(numbers.bookedValueIls),
       hint: "סכום הצעות שאושרו",
     },
   ];
@@ -226,7 +253,18 @@ export default function DashboardHome() {
   return (
     <div className="space-y-8">
       <section className="animate-rise">
-        <p className="text-sm font-medium text-brand">ארבעה מספרים</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-sm font-medium text-brand">ארבעה מספרים</p>
+          {showDemoBadge ? (
+            <span
+              role="status"
+              aria-label="Demo data"
+              className="inline-flex items-center rounded-md border border-amber-600/40 bg-amber-100 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-amber-950"
+            >
+              Demo data · נתוני דמו
+            </span>
+          ) : null}
+        </div>
         <h1 className="display mt-1 text-3xl font-bold sm:text-4xl">
           {tenant.businessName}
         </h1>
@@ -251,7 +289,12 @@ export default function DashboardHome() {
 
       <ReadinessChecklist />
 
-      <section className="grid gap-4 sm:grid-cols-2">
+      <section
+        className="grid gap-4 sm:grid-cols-2"
+        aria-label="Four beachhead numbers from tenant records"
+        data-source="tenant_records"
+        data-demo={showDemoBadge ? "true" : "false"}
+      >
         {fourCards.map((card) => (
           <div
             key={card.label}
