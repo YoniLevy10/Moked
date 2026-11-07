@@ -17,6 +17,13 @@ import { Prospect } from "@/lib/prospects";
 const DATA_DIR = path.join(process.cwd(), ".data");
 const DB_FILE = path.join(DATA_DIR, "db.json");
 
+export type WebhookEventRow = {
+  id: string;
+  tenantId: string | null;
+  payload: Record<string, unknown>;
+  processedAt: string;
+};
+
 export type DbShape = {
   tenants: Tenant[];
   conversations: Conversation[];
@@ -24,6 +31,7 @@ export type DbShape = {
   businessEvents: BusinessEvent[];
   prospects: Prospect[];
   phoneNumbers: PhoneNumber[];
+  webhookEvents: WebhookEventRow[];
   activeTenantId: string | null;
 };
 
@@ -47,6 +55,7 @@ function emptyDb(): DbShape {
     businessEvents: [],
     prospects: [],
     phoneNumbers: [],
+    webhookEvents: [],
     activeTenantId: null,
   };
 }
@@ -63,6 +72,7 @@ async function ensureDb(): Promise<DbShape> {
       businessEvents: parsed.businessEvents ?? [],
       prospects: parsed.prospects ?? [],
       phoneNumbers: parsed.phoneNumbers ?? [],
+      webhookEvents: parsed.webhookEvents ?? [],
     };
   } catch {
     const db = emptyDb();
@@ -428,6 +438,42 @@ export async function updatePhoneNumber(
   };
   await writeDb(db);
   return db.phoneNumbers[idx];
+}
+
+export async function getTenantBySubscriptionExternalId(
+  externalId: string,
+): Promise<Tenant | null> {
+  const db = await ensureDb();
+  return (
+    db.tenants.find((t) => t.subscription.externalId === externalId) ?? null
+  );
+}
+
+export async function getConversationByPaymentExternalId(
+  externalId: string,
+): Promise<Conversation | null> {
+  const db = await ensureDb();
+  return (
+    db.conversations.find((c) => c.payment?.externalId === externalId) ?? null
+  );
+}
+
+/** Returns true when this event id is newly claimed; false on replay. */
+export async function claimWebhookEvent(input: {
+  id: string;
+  tenantId: string | null;
+  payload: Record<string, unknown>;
+}): Promise<boolean> {
+  const db = await ensureDb();
+  if (db.webhookEvents.some((row) => row.id === input.id)) return false;
+  db.webhookEvents.push({
+    id: input.id,
+    tenantId: input.tenantId,
+    payload: input.payload,
+    processedAt: new Date().toISOString(),
+  });
+  await writeDb(db);
+  return true;
 }
 
 export function greetingFor(tenant: Tenant): string {

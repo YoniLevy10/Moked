@@ -273,6 +273,7 @@ export const ConversationSchema = z.object({
       linkUrl: z.string().optional(),
       status: z.enum(["none", "link_sent", "paid", "failed"]).optional(),
       provider: z.string().optional(),
+      externalId: z.string().optional(),
     })
     .optional(),
   updatedAt: z.string(),

@@ -28,11 +28,11 @@ function enabled(tenant: Tenant, key: ProcessKey): boolean {
   return Boolean(tenant.processes[key]?.enabled);
 }
 
-function runActiveProcess(
+async function runActiveProcess(
   tenant: Tenant,
   conversation: Conversation,
   inboundText: string,
-): ProcessResult {
+): Promise<ProcessResult> {
   const ctx = { tenant, conversation, inboundText };
 
   // Explicit intent keywords win over a stuck active process
@@ -125,7 +125,7 @@ function runActiveProcess(
           ...result.conversationPatch.quote,
         },
       };
-      const payment = handlePayment({
+      const payment = await handlePayment({
         tenant,
         conversation: mid,
         inboundText: "",
@@ -323,7 +323,7 @@ export async function handleInboundMessage(input: {
   if (metered && outboundPeriod(input.tenant).blocked) {
     result = { handled: true, replies: [], events: ["bot.cap_reached"] };
   } else {
-    result = runActiveProcess(input.tenant, conversation, input.text);
+    result = await runActiveProcess(input.tenant, conversation, input.text);
   }
 
   if (result.conversationPatch) {
