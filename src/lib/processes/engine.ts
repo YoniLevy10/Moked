@@ -25,6 +25,10 @@ import { resolveChannel } from "@/lib/channels";
 import { MessagingChannel } from "@/lib/channels/types";
 import { runAgentTurn } from "@/lib/agent";
 import { notifyOwnerFromAgent } from "@/lib/agent/notify";
+import {
+  blockingFailures,
+  evaluateReadiness,
+} from "@/lib/product/readiness";
 
 function enabled(tenant: Tenant, key: ProcessKey): boolean {
   return Boolean(tenant.processes[key]?.enabled);
@@ -311,6 +315,18 @@ export async function handleInboundMessage(input: {
       handled: true,
       replies: [],
       events: ["subscription.inactive"],
+    };
+    await persistEvents(input.tenant, conversation, result.events, channel);
+    return { conversation, result };
+  }
+
+  const readiness = await evaluateReadiness(input.tenant.id);
+  const blocked = blockingFailures(readiness);
+  if (blocked.length > 0) {
+    const result: ProcessResult = {
+      handled: true,
+      replies: [],
+      events: ["tenant.blocked"],
     };
     await persistEvents(input.tenant, conversation, result.events, channel);
     return { conversation, result };

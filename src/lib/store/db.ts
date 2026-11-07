@@ -664,6 +664,9 @@ export async function setProcessEnabled(
 }
 
 export async function connectWhatsAppDemo(tenantId: string): Promise<Tenant> {
+  if (!isRemoteDb()) return fileStore.connectWhatsAppDemo(tenantId);
+  const tenant = await getTenantById(tenantId);
+  if (!tenant) throw new Error("tenant_not_found");
   return updateTenant(tenantId, {
     whatsapp: {
       connected: true,
@@ -673,7 +676,52 @@ export async function connectWhatsAppDemo(tenantId: string): Promise<Tenant> {
       wabaId: `demo_waba_${tenantId}`,
       connectedAt: new Date().toISOString(),
     },
+    subscription: {
+      ...tenant.subscription,
+      status: "active",
+      provider: "demo",
+      externalId: tenant.subscription.externalId ?? `demo_sub_${tenantId}`,
+    },
+    bot: {
+      ...tenant.bot,
+      approved:
+        tenant.bot.approved ??
+        "מענה בעברית, קביעת תורים, והעברה לאדם כשמבקשים.",
+      approvedAt: tenant.bot.approvedAt ?? new Date().toISOString(),
+    },
   });
+}
+
+export async function listTemplatesForTenant(
+  tenantId: string,
+): Promise<import("@/lib/types").MessageTemplate[]> {
+  if (!isRemoteDb()) return fileStore.listTemplatesForTenant(tenantId);
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("templates")
+    .select("*")
+    .eq("tenant_id", tenantId);
+  if (error) {
+    if (/templates|relation|does not exist/i.test(error.message)) return [];
+    throw error;
+  }
+  return ((data ?? []) as Array<Record<string, unknown>>).map((row) => ({
+    id: String(row.id),
+    tenantId: String(row.tenant_id),
+    name: String(row.name),
+    language: String(row.language ?? "he"),
+    category: String(row.category ?? "UTILITY"),
+    components: (row.components as unknown[]) ?? [],
+    status: (row.status as "draft" | "pending" | "approved" | "rejected") ?? "pending",
+    metaId: row.meta_id ? String(row.meta_id) : undefined,
+    rejectionReason: row.rejection_reason
+      ? String(row.rejection_reason)
+      : undefined,
+    submittedAt: row.submitted_at ? String(row.submitted_at) : undefined,
+    approvedAt: row.approved_at ? String(row.approved_at) : undefined,
+    createdAt: String(row.created_at ?? new Date().toISOString()),
+    updatedAt: String(row.updated_at ?? new Date().toISOString()),
+  }));
 }
 
 export async function connectWhatsAppLive(

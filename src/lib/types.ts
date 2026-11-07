@@ -311,6 +311,27 @@ export const MessageSchema = z.object({
 
 export type Message = z.infer<typeof MessageSchema>;
 
+/** Thin Meta Message Template row (readiness / template lifecycle). */
+export const TemplateSchema = z.object({
+  id: z.string(),
+  tenantId: z.string(),
+  name: z.string(),
+  language: z.string().default("he"),
+  category: z.string().default("UTILITY"),
+  components: z.array(z.unknown()).default([]),
+  status: z
+    .enum(["draft", "pending", "approved", "rejected"])
+    .default("pending"),
+  metaId: z.string().optional(),
+  rejectionReason: z.string().optional(),
+  submittedAt: z.string().optional(),
+  approvedAt: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export type MessageTemplate = z.infer<typeof TemplateSchema>;
+
 export const VERTICALS: Record<
   Tenant["vertical"],
   { labelHe: string; defaultGreeting: string }
