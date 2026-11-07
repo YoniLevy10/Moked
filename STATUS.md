@@ -69,6 +69,7 @@
 | Templates | Hebrew utility lifecycle + channel send | ✅ |
 | Trades pack | knowledge + slot scheduler (no calendar) | ✅ |
 | Four numbers | פניות / תשובה תחת דקה / ביקורים / ערך | ✅ |
+| Live onboarding | שלום על מספר פרסום חדש (בלי Coexistence) | ✅ |
 | Auth + מחיצות משטחים | — | ✅ |
 | Meta Embedded Signup | — | ✅ קוד מוכן (דורש credentials) |
 | **Postgres (Supabase)** | `pgsmselyieizacwdsdjl` | ✅ סכמה + חיבור קוד |
