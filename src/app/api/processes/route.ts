@@ -7,16 +7,18 @@ import {
   triggerRetention,
 } from "@/lib/processes/engine";
 import { requireTenantContext } from "@/lib/auth/tenant-context";
+import { customerPaymentsEnabled } from "@/lib/product/flags";
 
 export async function GET() {
   const ctx = await requireTenantContext();
   if (!ctx.ok) return ctx.response;
-  const catalog = Object.values(PROCESS_CATALOG).sort(
-    (a, b) => a.order - b.order,
-  );
+  const catalog = Object.values(PROCESS_CATALOG)
+    .filter((p) => customerPaymentsEnabled() || p.key !== "payment")
+    .sort((a, b) => a.order - b.order);
   return NextResponse.json({
     catalog,
     enabled: ctx.tenant.processes,
+    customerPaymentsEnabled: customerPaymentsEnabled(),
   });
 }
 
@@ -29,6 +31,12 @@ export async function PATCH(req: NextRequest) {
   const ctx = await requireTenantContext();
   if (!ctx.ok) return ctx.response;
   const body = PatchSchema.parse(await req.json());
+  if (body.key === "payment" && !customerPaymentsEnabled()) {
+    return NextResponse.json(
+      { error: "customer_payments_parked" },
+      { status: 403 },
+    );
+  }
   const updated = await setProcessEnabled(
     ctx.tenant.id,
     body.key,
