@@ -242,14 +242,33 @@ class NeonQuery implements PromiseLike<DbResult<unknown>> {
   }
 }
 
-export function getRemote(): { from: (table: string) => any } {
+/** Loose query builder shared by Neon + Supabase admin clients. */
+export type RemoteQuery = {
+  select: (...args: unknown[]) => RemoteQuery;
+  insert: (row: unknown) => RemoteQuery;
+  update: (row: unknown) => RemoteQuery;
+  upsert: (row: unknown, options?: { onConflict?: string }) => RemoteQuery;
+  delete: () => RemoteQuery;
+  eq: (column: string, value: unknown) => RemoteQuery;
+  neq: (column: string, value: unknown) => RemoteQuery;
+  in: (column: string, values: unknown[]) => RemoteQuery;
+  order: (column: string, options?: { ascending?: boolean }) => RemoteQuery;
+  limit: (n: number) => RemoteQuery;
+  single: () => RemoteQuery;
+  maybeSingle: () => RemoteQuery;
+  then: PromiseLike<DbResult<unknown>>["then"];
+};
+
+type RemoteClient = { from: (table: string) => RemoteQuery };
+
+export function getRemote(): RemoteClient {
   if (hasNeon()) {
     return {
       from(table: string) {
         ident(table);
-        return new NeonQuery(table);
+        return new NeonQuery(table) as unknown as RemoteQuery;
       },
     };
   }
-  return getSupabaseAdmin() as { from: (table: string) => any };
+  return getSupabaseAdmin() as unknown as RemoteClient;
 }

@@ -275,6 +275,22 @@ export const ConversationSchema = z.object({
       provider: z.string().optional(),
     })
     .optional(),
+  /** Agent-layer memory (intent, clarify count, escalations, language). */
+  agent: z
+    .object({
+      stage: z.string().optional(),
+      lastIntent: z.string().optional(),
+      confidence: z.number().optional(),
+      language: z.enum(["he", "ar", "en"]).optional(),
+      askedSlots: z.array(z.string()).optional(),
+      clarifyCount: z.number().optional(),
+      pendingQuestion: z.string().optional(),
+      escalations: z.number().optional(),
+      groundedCount: z.number().optional(),
+      optedOut: z.boolean().optional(),
+      turnCount: z.number().optional(),
+    })
+    .default({}),
   updatedAt: z.string(),
   createdAt: z.string(),
 });
