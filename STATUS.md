@@ -39,6 +39,22 @@
 
 ---
 
+## תמחור SaaS (סביבה בלבד)
+
+| רכיב | Env | ברירת מחדל |
+|------|-----|------------|
+| הקמה | `MOKED_SETUP_FEE_ILS` | ₪690 |
+| חודשי | `MOKED_SUBSCRIPTION_ILS` | ₪299 |
+| שנתי | `MOKED_ANNUAL_ILS` | ₪2,990 |
+
+עשרת הלקוחות הראשונים: הקמה בחינם תמורת המלצה + רפרנס; חיוב ידני. **Checkout מלא של מנוי MOKED — אחרי go-live** (לא חוסם beachhead).
+
+גביית לקוח קצה (Wave D): מוסתרת מאחורי `MOKED_ENABLE_CUSTOMER_PAYMENTS=false`.
+
+## Agent layer
+
+ראו [`docs/AGENT.md`](./docs/AGENT.md) + [`docs/MOKED-AGENT-SPEC-EN.md`](./docs/MOKED-AGENT-SPEC-EN.md). `npm run eval:agent` חייב ירוק.
+
 ## איפה אנחנו בפיתוח
 
 | גל | תהליכים | סטטוס |
@@ -46,7 +62,8 @@
 | A | Intake → Qualification → Booking+כתובת | ✅ |
 | B | Reminders + Retention | ✅ |
 | C | Quote (+ הנחה אנושית) | ✅ |
-| D | Payment (`demo`) | ✅ סימולציה |
+| D | Payment (`demo`) | ⏸ מוסתר ב־v1 (`MOKED_ENABLE_CUSTOMER_PAYMENTS`) |
+| Agent | classify + grounding + eval | 🚧 |
 | Auth + מחיצות משטחים | — | ✅ |
 | Meta Embedded Signup | — | ✅ קוד מוכן (דורש credentials) |
 | **Postgres (Supabase)** | `pgsmselyieizacwdsdjl` | ✅ סכמה + חיבור קוד |
