@@ -291,6 +291,16 @@ export const ConversationSchema = z.object({
       turnCount: z.number().optional(),
     })
     .default({}),
+  escalation: z
+    .object({
+      reason: z.string(),
+      at: z.string(),
+      notifiedAt: z.string().optional(),
+      resolvedAt: z.string().optional(),
+      channel: z.enum(["whatsapp", "email", "log"]).optional(),
+      attempts: z.number().default(0),
+    })
+    .optional(),
   updatedAt: z.string(),
   createdAt: z.string(),
 });
