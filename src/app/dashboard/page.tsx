@@ -195,47 +195,38 @@ export default function DashboardHome() {
     (a, b) => a.order - b.order,
   );
 
-  const kpiCards: Array<{
+  /** Beachhead: one screen — four numbers only. */
+  const fourCards: Array<{
     label: string;
     value: string;
     hint: string;
   }> = [
     {
-      label: "לידים שנוצרו",
-      value: String(outcomes?.leadsCreated ?? 0),
-      hint: "פניות שהפכו לליד",
+      label: "פניות שהתקבלו",
+      value: String(outcomes?.inquiriesReceived ?? outcomes?.leadsCreated ?? 0),
+      hint: "לידים שנכנסו למספר החדש",
     },
     {
-      label: "לידים שסוננו",
-      value: String(outcomes?.leadsQualified ?? 0),
-      hint: `${outcomes?.leadsHot ?? 0} חמים`,
+      label: "נענו תוך דקה",
+      value: String(outcomes?.answeredUnder1Min ?? 0),
+      hint: "מענה ראשון מתחת ל־60 שניות",
     },
     {
-      label: "תורים שנקבעו",
-      value: String(outcomes?.appointmentsBooked ?? 0),
-      hint: "סגירות מועד",
+      label: "ביקורים שתוזמנו",
+      value: String(outcomes?.visitsScheduled ?? outcomes?.appointmentsBooked ?? 0),
+      hint: "תורים שנקבעו",
     },
     {
-      label: "הצעות שאושרו",
-      value: String(outcomes?.quotesAccepted ?? 0),
-      hint: "המרה להצעה",
-    },
-    {
-      label: "הכנסות",
-      value: formatIls(outcomes?.revenueIls ?? 0),
-      hint: `${outcomes?.paymentsCollected ?? 0} תשלומים`,
-    },
-    {
-      label: "לקוחות שחזרו",
-      value: String(outcomes?.customersReturned ?? 0),
-      hint: `${outcomes?.reviewsRequested ?? 0} בקשות ביקורת`,
+      label: "ערך שהוזמן",
+      value: formatIls(outcomes?.bookedValueIls ?? 0),
+      hint: "סכום הצעות שאושרו",
     },
   ];
 
   return (
     <div className="space-y-8">
       <section className="animate-rise">
-        <p className="text-sm font-medium text-brand">תוצאות עסקיות</p>
+        <p className="text-sm font-medium text-brand">ארבעה מספרים</p>
         <h1 className="display mt-1 text-3xl font-bold sm:text-4xl">
           {tenant.businessName}
         </h1>
@@ -260,15 +251,15 @@ export default function DashboardHome() {
 
       <ReadinessChecklist />
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {kpiCards.map((card) => (
+      <section className="grid gap-4 sm:grid-cols-2">
+        {fourCards.map((card) => (
           <div
             key={card.label}
-            className="rounded-3xl border border-line bg-white/70 p-5"
+            className="rounded-3xl border border-line bg-white/70 p-6"
           >
             <div className="text-sm font-semibold text-brand">{card.label}</div>
-            <div className="mt-2 display text-3xl font-bold">{card.value}</div>
-            <div className="mt-1 text-sm text-muted">{card.hint}</div>
+            <div className="mt-3 display text-4xl font-bold">{card.value}</div>
+            <div className="mt-2 text-sm text-muted">{card.hint}</div>
           </div>
         ))}
       </section>
