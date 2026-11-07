@@ -8,6 +8,10 @@ import {
 } from "@/lib/store/db";
 import { outboundPeriod } from "@/lib/product/bot";
 import { currentPeriod, toE164Il } from "@/lib/product/model";
+import {
+  blockingFailures,
+  evaluateReadiness,
+} from "@/lib/product/readiness";
 import { sendWhatsAppText } from "@/lib/whatsapp/client";
 import { Conversation, ProcessKey, Tenant } from "@/lib/types";
 import { handleIntake } from "@/lib/processes/waves/intake";
@@ -309,6 +313,18 @@ export async function handleInboundMessage(input: {
       handled: true,
       replies: [],
       events: ["subscription.inactive"],
+    };
+    await persistEvents(input.tenant, conversation, result.events, channel);
+    return { conversation, result };
+  }
+
+  const readiness = await evaluateReadiness(input.tenant.id);
+  const blocked = blockingFailures(readiness);
+  if (blocked.length > 0) {
+    const result: ProcessResult = {
+      handled: true,
+      replies: [],
+      events: ["tenant.blocked"],
     };
     await persistEvents(input.tenant, conversation, result.events, channel);
     return { conversation, result };

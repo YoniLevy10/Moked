@@ -707,6 +707,10 @@ export async function setProcessEnabled(
 }
 
 export async function connectWhatsAppDemo(tenantId: string): Promise<Tenant> {
+  const tenant = await getTenantById(tenantId);
+  if (!tenant) throw new Error("tenant_not_found");
+  // Demo WA path is the sell-path lab: mark subscription + bot ready so Wave A smoke
+  // and local demos work. Live go-live still requires full readiness (Graph checks).
   return updateTenant(tenantId, {
     whatsapp: {
       connected: true,
@@ -715,6 +719,19 @@ export async function connectWhatsAppDemo(tenantId: string): Promise<Tenant> {
       phoneNumberId: `demo_${tenantId}`,
       wabaId: `demo_waba_${tenantId}`,
       connectedAt: new Date().toISOString(),
+    },
+    subscription: {
+      ...tenant.subscription,
+      status: "active",
+      provider: "demo",
+      externalId: tenant.subscription.externalId ?? `demo_sub_${tenantId}`,
+    },
+    bot: {
+      ...tenant.bot,
+      approved:
+        tenant.bot.approved ??
+        "מענה בעברית, קביעת תורים, והעברה לאדם כשמבקשים.",
+      approvedAt: tenant.bot.approvedAt ?? new Date().toISOString(),
     },
   });
 }
@@ -1251,6 +1268,20 @@ export async function updateMessageDeliveryByMetaId(input: {
   if (error) throw error;
   if (!data) return null;
   return mapMessage(data as MessageRow);
+}
+
+export async function listTemplatesForTenant(
+  tenantId: string,
+): Promise<MessageTemplate[]> {
+  if (!isRemoteDb()) return fileStore.listTemplatesForTenant(tenantId);
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("templates")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  return ((data ?? []) as TemplateRow[]).map(mapTemplate);
 }
 
 export async function applyTemplateStatusUpdate(input: {

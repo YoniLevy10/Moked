@@ -60,6 +60,14 @@ DB: כשיש `SUPABASE_SERVICE_ROLE_KEY` האפליקציה כותבת ל־Supab
 מיגרציית לידים: `supabase/migrations/20260909095800_prospects.sql`
 מיגרציית מנוי: `supabase/migrations/20260909120000_subscription_columns.sql`
 
+### P0.3 — Readiness gate
+
+- `src/lib/product/readiness.ts` + `GET /api/tenants/readiness` + `POST /api/admin/tenants/[id]/go-live`
+- Engine חוסם עם `tenant.blocked` כשיש בדיקה חוסמת
+- דמו: בלי Graph; עדיין דורש WhatsApp / מנוי / הוראות (חיבור דמו מסמן lab-ready)
+- Live: גם token / webhook / display name דרך Graph
+- UI: רשימת מוכנות בדשבורד; לא מסמנים «חי» כש־`ready === false`
+
 ### P0.2 — Meta webhook hardening
 
 - `statuses[]` + `message_template_status_update` ב־`webhook.ts`

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PROCESS_CATALOG, ProcessKey, Tenant } from "@/lib/types";
 import type { OutcomeMetrics } from "@/lib/outcomes";
+import { ReadinessChecklist } from "@/components/dashboard/ReadinessChecklist";
 
 type Status = {
   connected: boolean;
@@ -256,6 +257,8 @@ export default function DashboardHome() {
           </Link>
         </p>
       </section>
+
+      <ReadinessChecklist />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {kpiCards.map((card) => (
