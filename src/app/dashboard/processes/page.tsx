@@ -45,17 +45,19 @@ export default function ProcessesPage() {
       <div>
         <h1 className="display text-3xl font-bold">7 התהליכים</h1>
         <p className="mt-2 text-muted">
-          כל הגלים בנויים במנוע. גל A דלוק כברירת מחדל; תשלומים (גל D) בסוף.
+          כל הגלים בנויים במנוע. גל A דלוק כברירת מחדל. גביית לקוח קצה (גל D)
+          מוסתרת ב־v1.
         </p>
       </div>
 
-      {waves.map((wave) => (
-        <section key={wave} className="space-y-3">
-          <h2 className="display text-lg font-bold text-brand">גל {wave}</h2>
-          <div className="space-y-3">
-            {catalog
-              .filter((p) => p.wave === wave)
-              .map((p) => {
+      {waves.map((wave) => {
+        const items = catalog.filter((p) => p.wave === wave);
+        if (items.length === 0) return null;
+        return (
+          <section key={wave} className="space-y-3">
+            <h2 className="display text-lg font-bold text-brand">גל {wave}</h2>
+            <div className="space-y-3">
+              {items.map((p) => {
                 const on = Boolean(enabled[p.key]?.enabled);
                 return (
                   <div
@@ -90,9 +92,10 @@ export default function ProcessesPage() {
                   </div>
                 );
               })}
-          </div>
-        </section>
-      ))}
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 }

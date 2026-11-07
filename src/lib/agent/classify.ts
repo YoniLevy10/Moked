@@ -97,6 +97,14 @@ function scoreIntent(text: string): { intent: Intent; confidence: number } {
   ) {
     return { intent: "book", confidence: 0.86 };
   }
+  // Trades problem report → intake (Wave A), never hard-escalate.
+  if (
+    /נזילה|סתימה|תקלה|שבור|לא עובד|תיקון|מזגן|חשמל|ברז|שיפוץ|דליפה|קצר|להגיע/i.test(
+      t,
+    )
+  ) {
+    return { intent: "book", confidence: 0.78 };
+  }
   if (
     /מה כולל|שירות|מה אתם עושים|service|ماذا تقدمون|خدمات/i.test(t)
   ) {
@@ -321,10 +329,15 @@ export function classifyMessage(input: ClassifyInput): AgentDecision {
   }
 
   if (intent === "book" || intent === "availability") {
+    const problemLead =
+      /נזילה|סתימה|תקלה|שבור|לא עובד|תיקון|מזגן|חשמל|ברז|שיפוץ|דליפה|קצר|להגיע/i.test(
+        text,
+      ) && !/לקבוע|תור|ביקור|קביעת|מועד|book|schedule/i.test(text);
     decision = {
       ...decision,
       nextAction: "route_process",
-      processKey: "booking",
+      // Fresh trades lead → intake; explicit book/availability → booking.
+      processKey: problemLead ? "intake" : "booking",
       confidence: Math.max(confidence, 0.8),
       slots: /מחר/.test(text)
         ? { when: "tomorrow" }
@@ -363,18 +376,16 @@ export function classifyMessage(input: ClassifyInput): AgentDecision {
     return applyConfidencePolicy(decision, { clarifyCount, turnCount });
   }
 
-  // unknown / unrelated
+  // unknown / unrelated — prefer intake over hard escalate so Wave A can run.
   decision = {
     ...decision,
-    nextAction: confidence < 0.45 ? "escalate" : "clarify",
+    nextAction: "route_process",
+    processKey: "intake",
+    confidence: Math.max(confidence, 0.5),
     reply:
-      confidence < 0.45
-        ? language === "en"
-          ? "I mostly help with visits and quotes for this business. Want to book?"
-          : "אני בעיקר עוזר לקבוע ביקור או הצעת מחיר כאן. רוצה לקבוע?"
-        : language === "en"
-          ? "Did you mean a visit booking, or a price question?"
-          : "התכוונת לקביעת ביקור, או לשאלת מחיר?",
+      language === "en"
+        ? "Got it — I can help book a visit or a quote. What do you need?"
+        : "קיבלתי — אפשר לעזור בקביעת ביקור או הצעת מחיר. במה מדובר?",
   };
   return applyConfidencePolicy(decision, { clarifyCount, turnCount });
 }

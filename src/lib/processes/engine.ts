@@ -34,8 +34,11 @@ import {
   escalationReasonFrom,
   maybeRenotifyEscalation,
 } from "@/lib/processes/escalation";
+import { customerPaymentsEnabled } from "@/lib/product/flags";
 
 function enabled(tenant: Tenant, key: ProcessKey): boolean {
+  // Wave D parked behind env flag for trades beachhead v1.
+  if (key === "payment" && !customerPaymentsEnabled()) return false;
   return Boolean(tenant.processes[key]?.enabled);
 }
 
