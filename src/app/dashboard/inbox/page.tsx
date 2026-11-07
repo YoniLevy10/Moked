@@ -1,12 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Conversation, Message } from "@/lib/types";
 
 type ConvRow = Conversation & { lastMessage?: Message };
 
+function waitLabel(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const mins = Math.max(0, Math.floor(ms / 60000));
+  if (mins < 60) return `${mins} דק׳`;
+  const hours = Math.floor(mins / 60);
+  return `${hours} שע׳`;
+}
+
 export default function InboxPage() {
   const [conversations, setConversations] = useState<ConvRow[]>([]);
+  const [waiting, setWaiting] = useState<ConvRow[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
 
@@ -14,6 +23,7 @@ export default function InboxPage() {
     const res = await fetch("/api/conversations");
     const data = await res.json();
     setConversations(data.conversations ?? []);
+    setWaiting(data.waitingForHuman ?? []);
   }
 
   async function loadMessages(id: string) {
@@ -23,11 +33,31 @@ export default function InboxPage() {
     setMessages(data.messages ?? []);
   }
 
-  async function takeover(id: string, status: "human_takeover" | "open") {
+  async function takeover(id: string) {
     await fetch("/api/conversations", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, status }),
+      body: JSON.stringify({ id, action: "takeover" }),
+    });
+    await loadList();
+    if (selected === id) await loadMessages(id);
+  }
+
+  async function resolve(id: string) {
+    await fetch("/api/conversations", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, action: "resolve" }),
+    });
+    await loadList();
+    if (selected === id) await loadMessages(id);
+  }
+
+  async function resumeAutomation(id: string) {
+    await fetch("/api/conversations", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, status: "open" }),
     });
     await loadList();
     if (selected === id) await loadMessages(id);
@@ -50,36 +80,91 @@ export default function InboxPage() {
     void loadList();
   }, []);
 
+  const waitingIds = useMemo(() => new Set(waiting.map((c) => c.id)), [waiting]);
+
   return (
     <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
-      <aside className="rounded-3xl border border-line bg-white/70 p-3">
-        <h1 className="display px-2 pb-3 text-xl font-bold">שיחות</h1>
-        <div className="max-h-[70vh] space-y-2 overflow-auto">
-          {conversations.length === 0 && (
-            <p className="px-2 text-sm text-muted">
-              אין שיחות עדיין — שלחו הודעה מהסימולטור בסקירה.
-            </p>
-          )}
-          {conversations.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => void loadMessages(c.id)}
-              className={`w-full rounded-2xl px-3 py-3 text-right transition ${
-                selected === c.id ? "bg-brand/10" : "hover:bg-paper-2"
-              }`}
-            >
-              <div className="font-semibold">
-                {c.customerName ?? c.customerWaId}
-              </div>
-              <div className="truncate text-xs text-muted">
-                {c.lastMessage?.body ?? "—"}
-              </div>
-              <div className="mt-1 text-[11px] text-brand">
-                {c.activeProcess ?? c.status}
-                {c.leadScore != null ? ` · ציון ${c.leadScore}` : ""}
-              </div>
-            </button>
-          ))}
+      <aside className="space-y-4">
+        <div className="rounded-3xl border border-line bg-white/70 p-3">
+          <h1 className="display px-2 pb-2 text-xl font-bold">ממתין לאדם</h1>
+          <p className="px-2 pb-3 text-xs text-muted">לפי זמן המתנה</p>
+          <div className="max-h-[28vh] space-y-2 overflow-auto">
+            {waiting.length === 0 && (
+              <p className="px-2 text-sm text-muted">אין שיחות ממתינות.</p>
+            )}
+            {waiting.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => void loadMessages(c.id)}
+                className={`w-full rounded-2xl px-3 py-3 text-right transition ${
+                  selected === c.id ? "bg-brand/10" : "hover:bg-paper-2"
+                }`}
+              >
+                <div className="font-semibold">
+                  {c.customerName ?? c.customerWaId}
+                </div>
+                <div className="text-xs text-danger">
+                  {c.escalation?.reason} · {waitLabel(c.escalation!.at)}
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void takeover(c.id);
+                    }}
+                    className="rounded-full border border-line px-2 py-1 text-[11px] font-medium"
+                  >
+                    השתלטות
+                  </span>
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void resolve(c.id);
+                    }}
+                    className="rounded-full border border-line px-2 py-1 text-[11px] font-medium"
+                  >
+                    סיום
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-line bg-white/70 p-3">
+          <h2 className="display px-2 pb-3 text-lg font-bold">כל השיחות</h2>
+          <div className="max-h-[40vh] space-y-2 overflow-auto">
+            {conversations.length === 0 && (
+              <p className="px-2 text-sm text-muted">
+                אין שיחות עדיין — שלחו הודעה מהסימולטור בסקירה.
+              </p>
+            )}
+            {conversations.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => void loadMessages(c.id)}
+                className={`w-full rounded-2xl px-3 py-3 text-right transition ${
+                  selected === c.id ? "bg-brand/10" : "hover:bg-paper-2"
+                }`}
+              >
+                <div className="font-semibold">
+                  {c.customerName ?? c.customerWaId}
+                  {waitingIds.has(c.id) ? " · ממתין" : ""}
+                </div>
+                <div className="truncate text-xs text-muted">
+                  {c.lastMessage?.body ?? "—"}
+                </div>
+                <div className="mt-1 text-[11px] text-brand">
+                  {c.activeProcess ?? c.status}
+                  {c.leadScore != null ? ` · ציון ${c.leadScore}` : ""}
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       </aside>
 
@@ -90,13 +175,19 @@ export default function InboxPage() {
           <>
             <div className="mb-4 flex flex-wrap gap-2">
               <button
-                onClick={() => void takeover(selected, "human_takeover")}
+                onClick={() => void takeover(selected)}
                 className="rounded-full border border-line px-4 py-2 text-sm font-medium"
               >
                 השתלטות אנושית
               </button>
               <button
-                onClick={() => void takeover(selected, "open")}
+                onClick={() => void resolve(selected)}
+                className="rounded-full border border-line px-4 py-2 text-sm font-medium"
+              >
+                סיום הסלמה
+              </button>
+              <button
+                onClick={() => void resumeAutomation(selected)}
                 className="rounded-full border border-line px-4 py-2 text-sm font-medium"
               >
                 החזר לאוטומציה
@@ -120,27 +211,21 @@ export default function InboxPage() {
                 שלח שימור
               </button>
             </div>
-            <div className="flex max-h-[65vh] flex-col gap-3 overflow-auto">
+            <div className="max-h-[65vh] space-y-3 overflow-auto">
               {messages.map((m) => (
                 <div
                   key={m.id}
-                  className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                  className={`rounded-2xl px-4 py-3 text-sm ${
                     m.direction === "inbound"
-                      ? "self-start bg-paper-2"
-                      : "self-end bg-brand text-white"
+                      ? "bg-paper-2"
+                      : "bg-brand/10 text-ink"
                   }`}
                 >
-                  <div className="whitespace-pre-wrap">{m.body}</div>
-                  <div
-                    className={`mt-1 text-[10px] ${
-                      m.direction === "inbound"
-                        ? "text-muted"
-                        : "text-white/70"
-                    }`}
-                  >
-                    {m.processKey ?? m.type} ·{" "}
+                  <div className="mb-1 text-[11px] text-muted">
+                    {m.direction === "inbound" ? "לקוח" : "MOKED"} ·{" "}
                     {new Date(m.createdAt).toLocaleString("he-IL")}
                   </div>
+                  <div className="whitespace-pre-wrap">{m.body}</div>
                 </div>
               ))}
             </div>
