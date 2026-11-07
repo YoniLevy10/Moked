@@ -4,6 +4,7 @@ import { nanoid } from "nanoid";
 import {
   Conversation,
   Message,
+  MessageTemplate,
   PhoneNumber,
   PROCESS_CATALOG,
   ProcessKey,
@@ -26,6 +27,7 @@ export type DbShape = {
   prospects: Prospect[];
   phoneNumbers: PhoneNumber[];
   tenantKnowledge: TenantKnowledgeRow[];
+  templates: MessageTemplate[];
   activeTenantId: string | null;
 };
 
@@ -50,6 +52,7 @@ function emptyDb(): DbShape {
     prospects: [],
     phoneNumbers: [],
     tenantKnowledge: [],
+    templates: [],
     activeTenantId: null,
   };
 }
@@ -67,6 +70,7 @@ async function ensureDb(): Promise<DbShape> {
       prospects: parsed.prospects ?? [],
       phoneNumbers: parsed.phoneNumbers ?? [],
       tenantKnowledge: parsed.tenantKnowledge ?? [],
+      templates: parsed.templates ?? [],
     };
   } catch {
     const db = emptyDb();
@@ -194,6 +198,8 @@ export async function setProcessEnabled(
 }
 
 export async function connectWhatsAppDemo(tenantId: string): Promise<Tenant> {
+  const tenant = await getTenantById(tenantId);
+  if (!tenant) throw new Error("tenant_not_found");
   return updateTenant(tenantId, {
     whatsapp: {
       connected: true,
@@ -203,7 +209,27 @@ export async function connectWhatsAppDemo(tenantId: string): Promise<Tenant> {
       wabaId: `demo_waba_${tenantId}`,
       connectedAt: new Date().toISOString(),
     },
+    subscription: {
+      ...tenant.subscription,
+      status: "active",
+      provider: "demo",
+      externalId: tenant.subscription.externalId ?? `demo_sub_${tenantId}`,
+    },
+    bot: {
+      ...tenant.bot,
+      approved:
+        tenant.bot.approved ??
+        "מענה בעברית, קביעת תורים, והעברה לאדם כשמבקשים.",
+      approvedAt: tenant.bot.approvedAt ?? new Date().toISOString(),
+    },
   });
+}
+
+export async function listTemplatesForTenant(
+  tenantId: string,
+): Promise<MessageTemplate[]> {
+  const db = await ensureDb();
+  return db.templates.filter((t) => t.tenantId === tenantId);
 }
 
 export async function connectWhatsAppLive(
