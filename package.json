@@ -8,6 +8,7 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
+    "test": "tsx --test src/**/*.test.ts",
     "dev:landing": "npm --prefix apps/landing run dev",
     "build:landing": "npm --prefix apps/landing run build",
     "smoke:wave-a": "node scripts/smoke-wave-a.mjs"
@@ -30,6 +31,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "5.8.2"
   }
 }

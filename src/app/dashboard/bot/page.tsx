@@ -57,6 +57,10 @@ export default function BotPage() {
     const res = await fetch("/api/billing/checkout", { method: "POST" });
     const data = await res.json();
     if (!res.ok) setError(data.error ?? "שגיאה");
+    else if (typeof data.checkoutUrl === "string" && data.checkoutUrl) {
+      window.location.href = data.checkoutUrl;
+      return;
+    }
     await refresh();
     setLoading(false);
   }

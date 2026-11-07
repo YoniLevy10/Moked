@@ -39,6 +39,10 @@ export const BusinessEventTypeSchema = z.enum([
   "human.takeover.active",
   "human.decision_needed",
   "message.sent",
+  "subscription.activated",
+  "message.failed",
+  "template.rejected",
+  "tenant.blocked",
 ]);
 
 export type BusinessEventType = z.infer<typeof BusinessEventTypeSchema>;

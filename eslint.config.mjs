@@ -12,7 +12,20 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "apps/**/.next/**",
+    "apps/**/next-env.d.ts",
   ]),
+  {
+    rules: {
+      // Pre-existing client pages load data in mount effects; keep as warn until refactored.
+      "react-hooks/set-state-in-effect": "warn",
+      "@next/next/no-img-element": "warn",
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;

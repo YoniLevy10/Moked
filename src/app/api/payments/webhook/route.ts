@@ -1,92 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  addBusinessEvents,
-  addMessage,
-  getConversationById,
-  getTenantById,
-  updateConversation,
-} from "@/lib/store/db";
-import { createInvoiceDraft } from "@/lib/integrations/invoicing";
+import { handlePspWebhook } from "@/lib/integrations/psp-webhook";
 
 /**
- * Wave D — payment provider webhook stub.
- * Providers (Grow/PayPlus/Tranzila/Cardcom) will POST here on payment success.
+ * Conversation payment notify — provider-agnostic.
+ * Correlate by payment.externalId only after PspClient.verifyWebhook.
  */
 export async function POST(req: NextRequest) {
-  const body = (await req.json()) as {
-    conversationId?: string;
-    status?: "paid" | "failed";
-    amountIls?: number;
-  };
-
-  if (!body.conversationId) {
-    return NextResponse.json({ error: "missing_conversationId" }, { status: 400 });
-  }
-
-  const conversation = await getConversationById(body.conversationId);
-  if (!conversation) {
-    return NextResponse.json({ error: "not_found" }, { status: 404 });
-  }
-
-  const tenant = await getTenantById(conversation.tenantId);
-  if (!tenant) {
-    return NextResponse.json({ error: "tenant_missing" }, { status: 400 });
-  }
-
-  if (body.status === "failed") {
-    await updateConversation(conversation.id, {
-      payment: { ...conversation.payment, status: "failed" },
-    });
-    await addBusinessEvents([
-      {
-        tenantId: tenant.id,
-        conversationId: conversation.id,
-        eventType: "payment.failed",
-        payload: {},
-        channel: "whatsapp",
-      },
-    ]);
-    return NextResponse.json({ ok: true, event: "payment.failed" });
-  }
-
-  const amountIls = body.amountIls ?? conversation.quote?.amountIls ?? 0;
-
-  await updateConversation(conversation.id, {
-    payment: { ...conversation.payment, status: "paid" },
-    activeProcess: undefined,
+  const raw = await req.text();
+  const result = await handlePspWebhook({
+    rawBody: raw,
+    signatureHeader: req.headers.get("x-moked-signature"),
   });
 
-  await addBusinessEvents([
-    {
-      tenantId: tenant.id,
-      conversationId: conversation.id,
-      eventType: "payment.paid",
-      payload: { amountIls },
-      channel: "whatsapp",
-    },
-  ]);
-
-  let invoice: { draftId: string; status: "draft" } | null = null;
-  if (tenant.integrations.invoicingProvider !== "none") {
-    invoice = createInvoiceDraft({
-      provider: tenant.integrations.invoicingProvider,
-      customerName: conversation.customerName ?? conversation.customerWaId,
-      amountIls,
-    });
+  if (!result.ok) {
+    if (result.error === "invalid_signature") {
+      return NextResponse.json({ error: "invalid_signature" }, { status: 401 });
+    }
+    if (result.error === "not_found") {
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
+    return NextResponse.json({ error: result.error }, { status: 400 });
   }
-
-  await addMessage({
-    conversationId: conversation.id,
-    tenantId: tenant.id,
-    direction: "outbound",
-    body: "התשלום התקבל בהצלחה. תודה!",
-    type: "system",
-    processKey: "payment",
-  });
 
   return NextResponse.json({
     ok: true,
-    event: "payment.paid",
-    invoice,
+    replay: result.replay,
+    kind: result.replay ? undefined : result.kind,
+    status: result.replay ? undefined : result.status,
   });
 }

@@ -47,6 +47,7 @@
 | B | Reminders + Retention | ✅ |
 | C | Quote (+ הנחה אנושית) | ✅ |
 | D | Payment (`demo`) | ✅ סימולציה |
+| **P0.1 PSP billing** | `PspClient` + Demo + Tranzila adapter | ✅ דמו מלא; live דרך מתאם (Tranzila ראשון, Grow/PayPlus/Cardcom בהמשך) |
 | Auth + מחיצות משטחים | — | ✅ |
 | Meta Embedded Signup | — | ✅ קוד מוכן (דורש credentials) |
 | **Postgres (Supabase)** | `pgsmselyieizacwdsdjl` | ✅ סכמה + חיבור קוד |
@@ -57,6 +58,15 @@
 DB: כשיש `SUPABASE_SERVICE_ROLE_KEY` האפליקציה כותבת ל־Supabase במקום `.data/db.json`.
 מיגרציית אירועים: `supabase/migrations/20260908225400_business_events.sql`
 מיגרציית לידים: `supabase/migrations/20260909095800_prospects.sql`
+מיגרציית מנוי: `supabase/migrations/20260909120000_subscription_columns.sql`
+
+### P0.1 — חיוב PSP (ספק-אגנוסטי)
+
+- חוזה: `PspClient` ב־`src/lib/integrations/psp.ts`; בחירה ב־`getPsp()` לפי `MOKED_PROVIDER_MODE` + `MOKED_BILLING_PROVIDER`.
+- דמו: `DemoPspClient` (בלי רשת). Live ראשון: `TranzilaClient` ב־`tranzila.ts` בלבד.
+- Webhooks: `psp-webhook.ts` → `verifyWebhook` + lookup לפי `externalId` + `webhook_events` idempotency.
+- Env: `PSP_WEBHOOK_SECRET` (גנרי); `TRANZILA_*` רק למתאם Tranzila.
+- **עדיין נדרש מבעלים:** בחירת ספק סופית + credentials בדשבורד הספק (Tranzila או אחר) כשעוברים ל־`MOKED_PROVIDER_MODE=live`.
 
 ---
 

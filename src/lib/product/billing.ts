@@ -1,40 +1,66 @@
-import { createHmac, timingSafeEqual } from "crypto";
+import {
+  providerMode,
+  pspWebhookSecret,
+  resolveBillingProvider,
+} from "@/lib/integrations/psp";
+import { getPsp } from "@/lib/integrations/get-psp";
 import { getTenantById, listPhoneNumbers, updateTenant } from "@/lib/store/db";
 import { subscriptionPriceIls } from "@/lib/product/model";
 import { lockAvailableNumber, parkTenantNumber } from "@/lib/product/pool";
 
+/** @deprecated Prefer pspWebhookSecret — kept for any residual callers. */
 export function billingWebhookSecret(): string | null {
-  const secret = process.env.BILLING_WEBHOOK_SECRET?.trim();
-  return secret || null;
-}
-
-export function verifyBillingSignature(rawBody: string, header: string | null): boolean {
-  const secret = billingWebhookSecret();
-  if (!secret || !header) return false;
-  const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
-  const left = Buffer.from(expected);
-  const right = Buffer.from(header.trim());
-  if (left.length !== right.length) return false;
-  return timingSafeEqual(left, right);
+  return pspWebhookSecret();
 }
 
 export async function startCheckout(tenantId: string) {
   const tenant = await getTenantById(tenantId);
   if (!tenant) throw new Error("tenant_not_found");
-  const externalId = `checkout_${Date.now()}`;
+
+  const priceIls = subscriptionPriceIls();
+  const mode = providerMode();
+
+  if (mode !== "live") {
+    const externalId = `checkout_demo_${Date.now()}`;
+    const updated = await updateTenant(tenantId, {
+      subscription: {
+        ...tenant.subscription,
+        status: "pending",
+        externalId,
+        provider: "demo",
+      },
+    });
+    return {
+      status: "pending" as const,
+      priceIls,
+      externalId,
+      checkoutUrl: null as string | null,
+      billingConnected: false,
+      tenant: updated,
+    };
+  }
+
+  const billingProvider = resolveBillingProvider();
+  const psp = getPsp(billingProvider);
+  const charge = await psp.createHostedCharge({
+    amountIls: priceIls,
+    description: `MOKED subscription — ${tenant.businessName}`,
+    tenantId,
+  });
   const updated = await updateTenant(tenantId, {
     subscription: {
       ...tenant.subscription,
       status: "pending",
-      externalId,
-      provider: process.env.MOKED_BILLING_PROVIDER || undefined,
+      externalId: charge.externalId,
+      provider: charge.provider,
     },
   });
   return {
     status: "pending" as const,
-    priceIls: subscriptionPriceIls(),
-    externalId,
-    billingConnected: Boolean(billingWebhookSecret()),
+    priceIls,
+    externalId: charge.externalId,
+    checkoutUrl: charge.hostedUrl,
+    billingConnected: Boolean(pspWebhookSecret()),
     tenant: updated,
   };
 }

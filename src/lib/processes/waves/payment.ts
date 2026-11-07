@@ -1,7 +1,7 @@
 import { ProcessContext, ProcessResult } from "@/lib/processes/types";
 import { createPaymentLink } from "@/lib/integrations/payments";
 
-export function handlePayment(ctx: ProcessContext): ProcessResult {
+export async function handlePayment(ctx: ProcessContext): Promise<ProcessResult> {
   const amount =
     ctx.conversation.quote?.amountIls ??
     ctx.tenant.pricing[0]?.priceIls ??
@@ -58,7 +58,7 @@ export function handlePayment(ctx: ProcessContext): ProcessResult {
     };
   }
 
-  const link = createPaymentLink({
+  const link = await createPaymentLink({
     provider,
     amountIls: amount,
     description: ctx.conversation.quote?.itemId ?? "MOKED payment",
@@ -79,7 +79,8 @@ export function handlePayment(ctx: ProcessContext): ProcessResult {
       payment: {
         linkUrl: link.url,
         status: "link_sent",
-        provider,
+        provider: link.provider,
+        externalId: link.externalId,
       },
     },
     events: ["payment.link_sent"],
