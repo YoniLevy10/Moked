@@ -7,9 +7,14 @@ import { useEffect, useState } from "react";
 const OWNER_NAV = [
   { href: "/dashboard", label: "סקירה" },
   { href: "/dashboard/inbox", label: "תיבת שיחות" },
+  { href: "/dashboard/knowledge", label: "ידע" },
+  { href: "/dashboard/pricing", label: "מחירים" },
+  { href: "/dashboard/policy", label: "מדיניות" },
+  { href: "/dashboard/escalation", label: "הסלמה" },
   { href: "/dashboard/processes", label: "תהליכים" },
   { href: "/dashboard/connections", label: "חיבורים" },
   { href: "/dashboard/bot", label: "הבוט" },
+  { href: "/onboarding", label: "הקמה מחדש" },
 ];
 
 function isCurrent(pathname: string, href: string) {

@@ -18,6 +18,9 @@ export default function InboxPage() {
   const [waiting, setWaiting] = useState<ConvRow[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [reply, setReply] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function loadList() {
     const res = await fetch("/api/conversations");
@@ -61,6 +64,28 @@ export default function InboxPage() {
     });
     await loadList();
     if (selected === id) await loadMessages(id);
+  }
+
+  async function sendOwnerReply() {
+    if (!selected || !reply.trim()) return;
+    setSending(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: selected, body: reply.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "שליחה נכשלה");
+      setReply("");
+      await loadList();
+      await loadMessages(selected);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "שגיאה");
+    } finally {
+      setSending(false);
+    }
   }
 
   async function runAction(
@@ -211,7 +236,7 @@ export default function InboxPage() {
                 שלח שימור
               </button>
             </div>
-            <div className="max-h-[65vh] space-y-3 overflow-auto">
+            <div className="max-h-[55vh] space-y-3 overflow-auto">
               {messages.map((m) => (
                 <div
                   key={m.id}
@@ -228,6 +253,28 @@ export default function InboxPage() {
                   <div className="whitespace-pre-wrap">{m.body}</div>
                 </div>
               ))}
+            </div>
+            <div className="mt-4 space-y-2 border-t border-line pt-4">
+              <p className="text-xs text-muted">
+                תשובת בעלים — מעבירה ל־human takeover והסוכן שותק עד החזרה
+                לאוטומציה.
+              </p>
+              <textarea
+                className="w-full rounded-2xl border border-line bg-white/80 px-4 py-3 text-sm outline-none ring-brand focus:ring-2"
+                rows={3}
+                value={reply}
+                onChange={(e) => setReply(e.target.value)}
+                placeholder="כתבו ללקוח…"
+              />
+              {error ? <p className="text-sm text-danger">{error}</p> : null}
+              <button
+                type="button"
+                disabled={sending || !reply.trim()}
+                onClick={() => void sendOwnerReply()}
+                className="rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {sending ? "שולח..." : "שלח כבעלים"}
+              </button>
             </div>
           </>
         )}

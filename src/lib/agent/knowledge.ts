@@ -160,6 +160,23 @@ export async function upsertTenantKnowledge(
   };
 }
 
+export async function deleteTenantKnowledge(
+  tenantId: string,
+  id: string,
+): Promise<boolean> {
+  if (!isRemote()) return fileStore.deleteTenantKnowledge(tenantId, id);
+  const sb = getRemote();
+  const { data, error } = await sb
+    .from("tenant_knowledge")
+    .delete()
+    .eq("id", id)
+    .eq("tenant_id", tenantId)
+    .select("id");
+  if (error) throw error;
+  const rows = (data ?? []) as Array<{ id: string }>;
+  return rows.length > 0;
+}
+
 /** Ensure pricing + bot.answers (+ trades pack FAQ) are mirrored into tenant_knowledge. */
 export async function seedKnowledgeFromTenant(
   tenant: Tenant,

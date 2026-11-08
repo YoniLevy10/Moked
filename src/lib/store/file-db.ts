@@ -485,6 +485,20 @@ export async function upsertTenantKnowledge(
   return row;
 }
 
+export async function deleteTenantKnowledge(
+  tenantId: string,
+  id: string,
+): Promise<boolean> {
+  const db = await ensureDb();
+  const before = db.tenantKnowledge.length;
+  db.tenantKnowledge = db.tenantKnowledge.filter(
+    (row) => !(row.id === id && row.tenantId === tenantId),
+  );
+  if (db.tenantKnowledge.length === before) return false;
+  await writeDb(db);
+  return true;
+}
+
 export async function addMessage(
   input: Omit<Message, "id" | "createdAt">,
 ): Promise<Message> {
