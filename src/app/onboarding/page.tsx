@@ -84,7 +84,16 @@ export default function OnboardingPage() {
         businessName: active.businessName,
         ownerName: active.ownerName,
         phone: active.phone,
-        vertical: active.vertical === "trades" ? "trades" : "other",
+        vertical:
+          active.vertical === "trades"
+            ? "trades"
+            : active.vertical === "beauty" || active.vertical === "coach"
+              ? "appointments"
+              : "trades",
+        appointmentKind:
+          active.vertical === "coach" || active.vertical === "beauty"
+            ? active.vertical
+            : f.appointmentKind,
       }));
       setPricing(
         (active.pricing ?? []).map((p) => ({
