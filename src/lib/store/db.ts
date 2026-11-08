@@ -671,9 +671,12 @@ export async function createTenant(input: {
   let tenant = await loadTenantBundle(created.id);
   if (!tenant) throw new Error("Tenant create failed");
   const { applyPackToTenant } = await import("@/lib/verticals/registry");
-  const packed = applyPackToTenant(tenant, input.vertical, {
-    niche: input.tradeKind,
-  });
+  const niche =
+    input.tradeKind ??
+    (input.vertical === "beauty" || input.vertical === "coach"
+      ? input.vertical
+      : undefined);
+  const packed = applyPackToTenant(tenant, input.vertical, { niche });
   if (packed !== tenant) {
     tenant = await updateTenant(tenant.id, {
       processes: packed.processes,

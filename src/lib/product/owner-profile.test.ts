@@ -91,14 +91,14 @@ describe("escalation policy snapshot", () => {
 });
 
 describe("onboarding steps catalog", () => {
-  it("has exactly 10 Hebrew steps and appointments grayed", () => {
+  it("has exactly 10 Hebrew steps and appointments selectable", () => {
     assert.equal(ONBOARDING_STEPS.length, 10);
     assert.equal(ONBOARDING_STEPS[0]?.key, "register");
     assert.equal(ONBOARDING_STEPS[9]?.key, "reedit");
     const appointments = ONBOARDING_VERTICALS.find(
       (v) => v.id === "appointments",
     );
-    assert.equal(appointments?.selectable, false);
+    assert.equal(appointments?.selectable, true);
     const trades = ONBOARDING_VERTICALS.find((v) => v.id === "trades");
     assert.equal(trades?.selectable, true);
   });

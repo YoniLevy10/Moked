@@ -14,7 +14,7 @@ export const ONBOARDING_STEPS = [
 
 export type OnboardingStepId = (typeof ONBOARDING_STEPS)[number]["id"];
 
-/** UI catalog — appointments grayed until P2 pack ships. */
+/** UI catalog — trades + appointments (beauty|coach; no medical clinics). */
 export const ONBOARDING_VERTICALS = [
   {
     id: "trades" as const,
@@ -25,8 +25,8 @@ export const ONBOARDING_VERTICALS = [
   {
     id: "appointments" as const,
     labelHe: "תורים / פגישות",
-    hintHe: "בקרוב (P2)",
-    selectable: false,
+    hintHe: "יופי · אימון — בלי קליניקות רפואיות",
+    selectable: true,
   },
 ] as const;
 
@@ -36,6 +36,12 @@ export const TRADE_KIND_OPTIONS = [
   { id: "hvac", labelHe: "מיזוג" },
   { id: "renovation", labelHe: "שיפוצים" },
   { id: "handyman", labelHe: "הנדימן" },
+] as const;
+
+/** Maps UI appointments niche → Tenant.vertical beauty|coach. */
+export const APPOINTMENT_KIND_OPTIONS = [
+  { id: "beauty", labelHe: "יופי / טיפוח" },
+  { id: "coach", labelHe: "אימון / ייעוץ" },
 ] as const;
 
 export function inferOnboardingStep(input: {

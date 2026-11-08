@@ -1,13 +1,13 @@
 import { ProcessContext, ProcessResult } from "@/lib/processes/types";
+import {
+  qualificationQuestionsForVertical,
+  slotPolicyForVertical,
+} from "@/lib/verticals/registry";
 
-/** Wave A qualification — after intake already asked the first timing question. */
-const QUESTIONS = [
-  "מתי נוח שנתאם ביקור? (היום / מחר / השבוע / גמיש)",
-  "באיזה אזור / עיר?",
-  "יש פרט חשוב שכדאי שנדע לפני הביקור?",
-];
-
-function scoreAnswers(answers: string[]): number {
+function scoreAnswers(
+  answers: string[],
+  model: "site_visit" | "appointment",
+): number {
   let score = 35;
   const blob = answers.join(" ").toLowerCase();
 
@@ -15,18 +15,29 @@ function scoreAnswers(answers: string[]): number {
   if (/מחר|השבוע/.test(blob)) score += 15;
   if (/גמיש/.test(blob)) score += 5;
 
-  if (
-    /ירושלים|תל אביב|חיפה|באר שבע|רמת גן|פתח תקווה|נתניה|אשדוד|חולון|רחובות|חדרה|מודיעין|אזור|עיר/.test(
-      blob,
-    )
-  ) {
-    score += 20;
-  } else if (answers[1] && answers[1].trim().length >= 2) {
-    score += 10;
+  if (model === "appointment") {
+    if (answers[1] && answers[1].trim().length >= 2) score += 20;
+    if (
+      /תספורת|צבע|מניקור|פדיקור|טיפול|אימון|מפגש|ייעוץ|אונליין|פרונטלי/.test(
+        blob,
+      )
+    ) {
+      score += 10;
+    }
+  } else {
+    if (
+      /ירושלים|תל אביב|חיפה|באר שבע|רמת גן|פתח תקווה|נתניה|אשדוד|חולון|רחובות|חדרה|מודיעין|אזור|עיר/.test(
+        blob,
+      )
+    ) {
+      score += 20;
+    } else if (answers[1] && answers[1].trim().length >= 2) {
+      score += 10;
+    }
+    if (/נזילה|חשמל|מזגן|סתימה|תקלה|כואב/.test(blob)) score += 10;
   }
 
   if (answers[2] && answers[2].trim().length >= 4) score += 10;
-  if (/נזילה|חשמל|מזגן|סתימה|תקלה|כואב/.test(blob)) score += 10;
 
   return Math.min(100, score);
 }
@@ -37,11 +48,13 @@ export function handleQualification(ctx: ProcessContext): ProcessResult {
   const answers = Array.isArray(state.qualificationAnswers)
     ? ([...state.qualificationAnswers] as string[])
     : [];
+  const questions = qualificationQuestionsForVertical(ctx.tenant.vertical);
+  const policy = slotPolicyForVertical(ctx.tenant.vertical);
 
   if (!state.qualificationAsked) {
     return {
       handled: true,
-      replies: [{ body: QUESTIONS[0], processKey: "qualification" }],
+      replies: [{ body: questions[0], processKey: "qualification" }],
       conversationPatch: {
         activeProcess: "qualification",
         processState: {
@@ -49,6 +62,7 @@ export function handleQualification(ctx: ProcessContext): ProcessResult {
           qualificationAsked: true,
           qualificationStep: 0,
           qualificationAnswers: [],
+          bookingModel: policy.model,
         },
       },
       events: ["lead.qualification_started"],
@@ -71,10 +85,10 @@ export function handleQualification(ctx: ProcessContext): ProcessResult {
   answers.push(answer);
   const nextStep = step + 1;
 
-  if (nextStep < QUESTIONS.length) {
+  if (nextStep < questions.length) {
     return {
       handled: true,
-      replies: [{ body: QUESTIONS[nextStep], processKey: "qualification" }],
+      replies: [{ body: questions[nextStep], processKey: "qualification" }],
       conversationPatch: {
         activeProcess: "qualification",
         processState: {
@@ -82,13 +96,16 @@ export function handleQualification(ctx: ProcessContext): ProcessResult {
           qualificationStep: nextStep,
           qualificationAnswers: answers,
           preferTime: answers[0],
-          area: answers[1],
+          ...(policy.model === "appointment"
+            ? { desiredService: answers[1] }
+            : { area: answers[1] }),
+          bookingModel: policy.model,
         },
       },
     };
   }
 
-  const score = scoreAnswers(answers);
+  const score = scoreAnswers(answers, policy.model);
   const hot = score >= 50;
   const bookingEnabled = Boolean(ctx.tenant.processes.booking?.enabled);
 
@@ -111,13 +128,16 @@ export function handleQualification(ctx: ProcessContext): ProcessResult {
         qualificationAnswers: answers,
         qualificationDone: true,
         preferTime: answers[0],
-        area: answers[1],
+        ...(policy.model === "appointment"
+          ? { desiredService: answers[1] }
+          : { area: answers[1] }),
         notes: answers[2],
         handoffToBooking: hot && bookingEnabled,
+        bookingModel: policy.model,
       },
     },
     events: hot
       ? ["lead.qualified", "lead.hot"]
-      : ["lead.qualified", "lead.warm_or_cold"],
+      : ["lead.qualified"],
   };
 }
