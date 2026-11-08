@@ -316,6 +316,10 @@ export const MessageSchema = z.object({
   type: z.enum(["text", "template", "interactive", "system"]).default("text"),
   processKey: ProcessKeySchema.optional(),
   metaMessageId: z.string().optional(),
+  deliveredAt: z.string().optional(),
+  readAt: z.string().optional(),
+  failedAt: z.string().optional(),
+  errorCode: z.string().optional(),
   createdAt: z.string(),
 });
 

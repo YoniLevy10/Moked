@@ -136,6 +136,10 @@ create table public.messages (
   type public.message_type not null default 'text',
   process_key public.process_key,
   meta_message_id text,
+  delivered_at timestamptz,
+  read_at timestamptz,
+  failed_at timestamptz,
+  error_code text,
   created_at timestamptz not null default now()
 );
 
