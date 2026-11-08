@@ -19,7 +19,11 @@ export async function POST(_req: NextRequest, { params }: Params) {
   }
 
   bustReadinessCache(id);
-  const report = await evaluateReadiness(id, { bypassCache: true });
+  // Go-live always runs live probes — demo-relaxed ready must not unlock live.
+  const report = await evaluateReadiness(id, {
+    bypassCache: true,
+    forceLive: true,
+  });
   if (!report.ready) {
     return NextResponse.json(
       {

@@ -160,6 +160,26 @@ export const PhoneNumberSchema = z.object({
 });
 export type PhoneNumber = z.infer<typeof PhoneNumberSchema>;
 
+/** Owner-configured visit windows. day: 0=Sun … 6=Sat (Asia/Jerusalem). */
+export const AvailabilityWindowSchema = z.object({
+  day: z.number().int().min(0).max(6),
+  startHour: z.number().int().min(0).max(23),
+  endHour: z.number().int().min(1).max(24),
+});
+export type AvailabilityWindow = z.infer<typeof AvailabilityWindowSchema>;
+
+export const TenantAvailabilitySchema = z.object({
+  timezone: z.string().default("Asia/Jerusalem"),
+  windows: z.array(AvailabilityWindowSchema).default([]),
+  /** Max confirmed visits per calendar day. 0 = no inventable slots. */
+  dailyCapacity: z.number().int().min(0).default(0),
+});
+export type TenantAvailability = z.infer<typeof TenantAvailabilitySchema>;
+
+export function defaultAvailability(): TenantAvailability {
+  return { timezone: "Asia/Jerusalem", windows: [], dailyCapacity: 0 };
+}
+
 export const TenantSchema = z.object({
   id: z.string(),
   businessName: z.string(),
@@ -210,6 +230,12 @@ export const TenantSchema = z.object({
       paymentsProvider: "none",
       invoicingProvider: "none",
     }),
+  /** Structured visit hours + daily capacity (not free-text bot hours). */
+  availability: TenantAvailabilitySchema.default({
+    timezone: "Asia/Jerusalem",
+    windows: [],
+    dailyCapacity: 0,
+  }),
   pricing: z
     .array(
       z.object({

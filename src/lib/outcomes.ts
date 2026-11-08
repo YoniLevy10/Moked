@@ -15,6 +15,7 @@ export const BusinessEventTypeSchema = z.enum([
   "intake.spam_filtered",
   "intake.support_escalated",
   "booking.proposed",
+  "booking.no_availability",
   "booking.slot_chosen",
   "booking.confirmed",
   "booking.rescheduled",

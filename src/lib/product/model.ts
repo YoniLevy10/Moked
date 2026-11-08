@@ -1,4 +1,12 @@
-import { BotAnswers, BotInstructions, PhoneNumber, Subscription, Tenant } from "@/lib/types";
+import {
+  BotAnswers,
+  BotInstructions,
+  defaultAvailability,
+  PhoneNumber,
+  Subscription,
+  Tenant,
+  TenantAvailabilitySchema,
+} from "@/lib/types";
 
 export {
   annualSubscriptionIls,
@@ -38,8 +46,14 @@ export function normalizeTenant(tenant: Tenant): Tenant {
     ...defaultBot().answers,
     ...(tenant.bot?.answers ?? {}),
   };
+  const availabilityParsed = TenantAvailabilitySchema.safeParse(
+    tenant.availability ?? defaultAvailability(),
+  );
   return {
     ...tenant,
+    availability: availabilityParsed.success
+      ? availabilityParsed.data
+      : defaultAvailability(),
     subscription,
     bot: {
       ...defaultBot(),

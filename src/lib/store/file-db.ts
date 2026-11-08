@@ -12,6 +12,7 @@ import {
   VERTICALS,
 } from "@/lib/types";
 import { defaultBot, defaultSubscription, normalizeTenant } from "@/lib/product/model";
+import { defaultAvailability } from "@/lib/types";
 import { BusinessEvent } from "@/lib/outcomes";
 import { Prospect } from "@/lib/prospects";
 import type { TenantKnowledgeRow } from "@/lib/agent/types";
@@ -142,6 +143,7 @@ export async function createTenant(input: {
       paymentsProvider: "none",
       invoicingProvider: "none",
     },
+    availability: defaultAvailability(),
     pricing: [
       {
         id: nanoid(8),
@@ -181,6 +183,14 @@ export async function updateTenant(
     ...current,
     ...patch,
     whatsapp: patch.whatsapp ? { ...current.whatsapp, ...patch.whatsapp } : current.whatsapp,
+    availability: patch.availability
+      ? {
+          ...defaultAvailability(),
+          ...current.availability,
+          ...patch.availability,
+          windows: patch.availability.windows ?? current.availability?.windows ?? [],
+        }
+      : current.availability ?? defaultAvailability(),
     subscription: patch.subscription
       ? { ...current.subscription, ...patch.subscription }
       : current.subscription,
