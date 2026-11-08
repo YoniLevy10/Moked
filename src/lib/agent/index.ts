@@ -1,4 +1,6 @@
 import { classifyMessage } from "@/lib/agent/classify";
+import { runLlmAgentDecision } from "@/lib/agent/llm";
+import { logAgentTurn } from "@/lib/agent/observability";
 import {
   agentDryRun,
   agentEnabled,
@@ -36,21 +38,63 @@ function repliesFromDecision(decision: AgentDecision): OutboundAction[] {
   ];
 }
 
+function finalizeTurn(input: {
+  decision: AgentDecision;
+  prev: ConversationAgentState;
+  tenantId: string;
+  conversationId?: string;
+  metaMessageId?: string;
+  source: "llm" | "classifier" | "passthrough";
+  usage?: AgentTurnResult["usage"];
+  latencyMs?: number;
+  handled: boolean;
+  replies: OutboundAction[];
+  conversationPatch?: Partial<Conversation>;
+  events?: string[];
+}): AgentTurnResult {
+  logAgentTurn({
+    tenantId: input.tenantId,
+    conversationId: input.conversationId,
+    metaMessageId: input.metaMessageId,
+    source: input.source,
+    decision: {
+      intent: input.decision.intent,
+      nextAction: input.decision.nextAction,
+      confidence: input.decision.confidence,
+      language: input.decision.language,
+      processKey: input.decision.processKey,
+    },
+    groundedCount: input.decision.groundings.length,
+    usage: input.usage,
+    latencyMs: input.latencyMs,
+  });
+  return {
+    decision: input.decision,
+    handled: input.handled,
+    replies: input.replies,
+    conversationPatch: input.conversationPatch,
+    events: input.events,
+    usage: input.usage,
+    source: input.source,
+  };
+}
+
 /**
  * Single agent entry point. Wired in engine before runActiveProcess.
  *
- * Without LLM key: deterministic classifier still answers grounded FAQs
- * (zero cost). Spec D.4 "handled:false when key absent" is interpreted with
- * the beachhead lock that demo must work with no LLM — process continuation
- * and disabled agent still pass through; grounded free replies do not invent prices.
+ * With LLM key: structured model + tools (lookup_price, propose_slots, …).
+ * Without key / LLM failure: deterministic classifier (demo, zero cost).
+ * Prices/availability never invented — tools / pricing_items / availability only.
  */
 export async function runAgentTurn(input: {
   tenant: Tenant;
   conversation: Conversation;
   inboundText: string;
+  metaMessageId?: string;
 }): Promise<AgentTurnResult> {
+  const started = Date.now();
   if (!agentEnabled()) {
-    return {
+    return finalizeTurn({
       decision: {
         intent: "unknown",
         language: "he",
@@ -59,14 +103,20 @@ export async function runAgentTurn(input: {
         groundings: [],
         nextAction: "reply",
       },
+      prev: {},
+      tenantId: input.tenant.id,
+      conversationId: input.conversation.id,
+      metaMessageId: input.metaMessageId,
+      source: "passthrough",
       handled: false,
       replies: [],
-    };
+      latencyMs: Date.now() - started,
+    });
   }
 
   const prev = readAgentState(input.conversation);
   if (prev.optedOut) {
-    return {
+    return finalizeTurn({
       decision: {
         intent: "opt_out",
         language: prev.language ?? "he",
@@ -75,13 +125,19 @@ export async function runAgentTurn(input: {
         groundings: [],
         nextAction: "opt_out",
       },
+      prev,
+      tenantId: input.tenant.id,
+      conversationId: input.conversation.id,
+      metaMessageId: input.metaMessageId,
+      source: "passthrough",
       handled: true,
       replies: [],
-    };
+      latencyMs: Date.now() - started,
+    });
   }
 
   if (input.conversation.status === "human_takeover") {
-    return {
+    return finalizeTurn({
       decision: {
         intent: "human_request",
         language: prev.language ?? "he",
@@ -90,15 +146,21 @@ export async function runAgentTurn(input: {
         groundings: [],
         nextAction: "escalate",
       },
+      prev,
+      tenantId: input.tenant.id,
+      conversationId: input.conversation.id,
+      metaMessageId: input.metaMessageId,
+      source: "passthrough",
       handled: true,
       replies: [],
       events: ["human.takeover.active"],
-    };
+      latencyMs: Date.now() - started,
+    });
   }
 
   // Active process continues → pass through to deterministic engine (D.4)
   if (input.conversation.activeProcess) {
-    return {
+    return finalizeTurn({
       decision: {
         intent: "unknown",
         language: prev.language ?? "he",
@@ -108,27 +170,98 @@ export async function runAgentTurn(input: {
         nextAction: "route_process",
         processKey: input.conversation.activeProcess,
       },
+      prev,
+      tenantId: input.tenant.id,
+      conversationId: input.conversation.id,
+      metaMessageId: input.metaMessageId,
+      source: "passthrough",
       handled: false,
       replies: [],
-    };
+      latencyMs: Date.now() - started,
+    });
   }
 
   const extra = await listTenantKnowledge(input.tenant.id).catch(() => []);
-  const decision = classifyMessage({
-    text: input.inboundText,
-    tenant: input.tenant,
-    conversation: {
-      ...input.conversation,
-      // expose agent state to classifier via cast field
-      ...( { agent: prev } as object),
-    } as Conversation,
-    extraKnowledge: extra,
-  });
 
-  // Without LLM, route_process always falls through to the engine
+  let decision: AgentDecision;
+  let source: "llm" | "classifier" = "classifier";
+  let usage: AgentTurnResult["usage"];
+
+  if (hasLlmKey()) {
+    try {
+      const llm = await runLlmAgentDecision({
+        tenant: input.tenant,
+        conversation: input.conversation,
+        inboundText: input.inboundText,
+        knowledge: extra,
+        agentState: prev,
+        languageHint: prev.language,
+      });
+      if (llm) {
+        decision = llm.decision;
+        source = "llm";
+        usage = llm.usage;
+      } else {
+        decision = classifyMessage({
+          text: input.inboundText,
+          tenant: input.tenant,
+          conversation: {
+            ...input.conversation,
+            ...({ agent: prev } as object),
+          } as Conversation,
+          extraKnowledge: extra,
+        });
+      }
+    } catch (err) {
+      logAgentTurn({
+        tenantId: input.tenant.id,
+        conversationId: input.conversation.id,
+        metaMessageId: input.metaMessageId,
+        source: "llm",
+        decision: {
+          intent: "unknown",
+          nextAction: "escalate",
+          confidence: 0,
+          language: prev.language ?? "he",
+        },
+        groundedCount: 0,
+        error: err instanceof Error ? err.message : "llm_error",
+        latencyMs: Date.now() - started,
+      });
+      decision = classifyMessage({
+        text: input.inboundText,
+        tenant: input.tenant,
+        conversation: {
+          ...input.conversation,
+          ...({ agent: prev } as object),
+        } as Conversation,
+        extraKnowledge: extra,
+      });
+    }
+  } else {
+    decision = classifyMessage({
+      text: input.inboundText,
+      tenant: input.tenant,
+      conversation: {
+        ...input.conversation,
+        ...({ agent: prev } as object),
+      } as Conversation,
+      extraKnowledge: extra,
+    });
+  }
+
+  const latencyMs = Date.now() - started;
+
   if (decision.nextAction === "route_process") {
-    return {
+    return finalizeTurn({
       decision,
+      prev,
+      tenantId: input.tenant.id,
+      conversationId: input.conversation.id,
+      metaMessageId: input.metaMessageId,
+      source,
+      usage,
+      latencyMs,
       handled: false,
       replies: [],
       conversationPatch: {
@@ -140,7 +273,7 @@ export async function runAgentTurn(input: {
           grounded: decision.groundings.length > 0,
         }),
       } as Partial<Conversation>,
-    };
+    });
   }
 
   const escalations = prev.escalations ?? 0;
@@ -148,22 +281,23 @@ export async function runAgentTurn(input: {
     decision.nextAction === "escalate" &&
     escalations >= maxEscalationsPerConversation()
   ) {
-    return {
-      decision: {
-        ...decision,
-        reply:
-          decision.reply ??
-          "בעל העסק כבר קיבל את הפנייה ויחזור אליך.",
-      },
+    const capped = {
+      ...decision,
+      reply:
+        decision.reply ??
+        "בעל העסק כבר קיבל את הפנייה ויחזור אליך.",
+    };
+    return finalizeTurn({
+      decision: capped,
+      prev,
+      tenantId: input.tenant.id,
+      conversationId: input.conversation.id,
+      metaMessageId: input.metaMessageId,
+      source,
+      usage,
+      latencyMs,
       handled: true,
-      replies: agentDryRun()
-        ? []
-        : repliesFromDecision({
-            ...decision,
-            reply:
-              decision.reply ??
-              "בעל העסק כבר קיבל את הפנייה ויחזור אליך.",
-          }),
+      replies: agentDryRun() ? [] : repliesFromDecision(capped),
       conversationPatch: {
         agent: mergeAgentState(prev, {
           intent: decision.intent,
@@ -174,7 +308,7 @@ export async function runAgentTurn(input: {
         }),
       } as Partial<Conversation>,
       events: ["human.decision_needed"],
-    };
+    });
   }
 
   const agentPatch = mergeAgentState(prev, {
@@ -186,8 +320,15 @@ export async function runAgentTurn(input: {
   });
 
   if (decision.nextAction === "opt_out") {
-    return {
+    return finalizeTurn({
       decision,
+      prev,
+      tenantId: input.tenant.id,
+      conversationId: input.conversation.id,
+      metaMessageId: input.metaMessageId,
+      source,
+      usage,
+      latencyMs,
       handled: true,
       replies: agentDryRun() ? [] : repliesFromDecision(decision),
       conversationPatch: {
@@ -195,12 +336,19 @@ export async function runAgentTurn(input: {
         agent: { ...agentPatch, optedOut: true },
       } as Partial<Conversation>,
       events: ["agent.opt_out"],
-    };
+    });
   }
 
   if (decision.nextAction === "escalate") {
-    return {
+    return finalizeTurn({
       decision,
+      prev,
+      tenantId: input.tenant.id,
+      conversationId: input.conversation.id,
+      metaMessageId: input.metaMessageId,
+      source,
+      usage,
+      latencyMs,
       handled: true,
       replies: agentDryRun() ? [] : repliesFromDecision(decision),
       conversationPatch: {
@@ -208,15 +356,19 @@ export async function runAgentTurn(input: {
         agent: agentPatch,
       } as Partial<Conversation>,
       events: ["human.decision_needed", "human.takeover.active"],
-    };
+    });
   }
 
   if (decision.nextAction === "reply" || decision.nextAction === "clarify") {
-    // Deterministic grounded replies work without LLM (beachhead demo lock).
-    // LLM path reserved for future enrichment when hasLlmKey().
-    void hasLlmKey;
-    return {
+    return finalizeTurn({
       decision,
+      prev,
+      tenantId: input.tenant.id,
+      conversationId: input.conversation.id,
+      metaMessageId: input.metaMessageId,
+      source,
+      usage,
+      latencyMs,
       handled: Boolean(decision.reply?.trim()),
       replies: agentDryRun() ? [] : repliesFromDecision(decision),
       conversationPatch: {
@@ -225,8 +377,19 @@ export async function runAgentTurn(input: {
       events: decision.groundings.length
         ? ["agent.grounded_reply"]
         : ["agent.clarify"],
-    };
+    });
   }
 
-  return { decision, handled: false, replies: [] };
+  return finalizeTurn({
+    decision,
+    prev,
+    tenantId: input.tenant.id,
+    conversationId: input.conversation.id,
+    metaMessageId: input.metaMessageId,
+    source,
+    usage,
+    latencyMs,
+    handled: false,
+    replies: [],
+  });
 }

@@ -25,6 +25,7 @@ const CONFLICT: Record<string, string> = {
   profiles: "id",
   tenant_secrets: "tenant_id",
   tenant_processes: "tenant_id, process_key",
+  platform_settings: "key",
 };
 
 let sqlClient: Sql | null = null;

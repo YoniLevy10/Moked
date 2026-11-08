@@ -5,6 +5,12 @@
  *
  * Hard gate: zero invented prices (any failure exits 1).
  * Routing accuracy target >= 90%.
+ *
+ * This harness runs the deterministic classifier (no API cost). With
+ * MOKED_LLM_API_KEY / OPENAI_API_KEY set, production uses runLlmAgentDecision
+ * + tools; invented prices are still blocked by enforceNoInventedPrices and
+ * lookup_price (pricing_items only). To smoke the LLM path locally, call
+ * runAgentTurn against a fixture tenant with a key set and assert 0 invented ₪.
  */
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";

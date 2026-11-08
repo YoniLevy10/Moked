@@ -526,6 +526,24 @@ export async function addMessage(
   return message;
 }
 
+export async function getTenantBySubscriptionExternalId(
+  externalId: string,
+): Promise<Tenant | null> {
+  const db = await ensureDb();
+  return (
+    db.tenants.find((t) => t.subscription.externalId === externalId) ?? null
+  );
+}
+
+export async function getConversationByPaymentExternalId(
+  externalId: string,
+): Promise<Conversation | null> {
+  const db = await ensureDb();
+  return (
+    db.conversations.find((c) => c.payment?.externalId === externalId) ?? null
+  );
+}
+
 export async function claimWebhookEvent(input: {
   id: string;
   tenantId: string | null;

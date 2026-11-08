@@ -252,7 +252,8 @@ function mapConversation(row: ConversationRow): Conversation {
   const hasPayment =
     row.payment_link_url ||
     (row.payment_status && row.payment_status !== "none") ||
-    row.payment_provider;
+    row.payment_provider ||
+    row.payment_external_id;
 
   return {
     id: row.id,
@@ -297,6 +298,7 @@ function mapConversation(row: ConversationRow): Conversation {
           linkUrl: row.payment_link_url ?? undefined,
           status: row.payment_status,
           provider: row.payment_provider ?? undefined,
+          externalId: row.payment_external_id ?? undefined,
         }
       : undefined,
     agent: row.agent ?? {},
@@ -472,13 +474,15 @@ export async function getDb(): Promise<DbShape> {
   } else {
     prospects = ((prospectsRes.data ?? []) as ProspectRow[]).map(mapProspect);
   }
+  const activeTenantId =
+    (await readPlatformActiveTenantId()) ?? tenants[0]?.id ?? null;
   return {
     tenants,
     conversations: ((convRows ?? []) as ConversationRow[]).map(mapConversation),
     messages: ((msgRows ?? []) as MessageRow[]).map(mapMessage),
     businessEvents,
     prospects,
-    activeTenantId: tenants[0]?.id ?? null,
+    activeTenantId,
   };
 }
 
@@ -547,8 +551,54 @@ export async function getConversationById(
   return mapConversation(data as ConversationRow);
 }
 
+async function readPlatformActiveTenantId(): Promise<string | null> {
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("platform_settings")
+    .select("value")
+    .eq("key", "active_tenant_id")
+    .maybeSingle();
+  if (error) {
+    // Table may not exist yet on older deploys — fall through.
+    if (/platform_settings|relation|does not exist/i.test(error.message)) {
+      return null;
+    }
+    throw error;
+  }
+  const row = data as { value?: string | null } | null;
+  const value = row?.value?.trim();
+  return value || null;
+}
+
+async function writePlatformActiveTenantId(tenantId: string): Promise<void> {
+  const sb = getSupabaseAdmin();
+  const { error } = await sb.from("platform_settings").upsert(
+    {
+      key: "active_tenant_id",
+      value: tenantId,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "key" },
+  );
+  if (error) {
+    if (/platform_settings|relation|does not exist/i.test(error.message)) {
+      console.warn(
+        "[moked:active-tenant] platform_settings missing — activate not persisted",
+        error.message,
+      );
+      return;
+    }
+    throw error;
+  }
+}
+
 export async function getActiveTenant(): Promise<Tenant | null> {
   if (!isRemoteDb()) return fileStore.getActiveTenant();
+  const activeId = await readPlatformActiveTenantId();
+  if (activeId) {
+    const selected = await loadTenantBundle(activeId);
+    if (selected) return selected;
+  }
   const tenants = await loadAllTenants();
   return tenants[0] ?? null;
 }
@@ -557,7 +607,43 @@ export async function setActiveTenantId(tenantId: string): Promise<Tenant> {
   if (!isRemoteDb()) return fileStore.setActiveTenantId(tenantId);
   const tenant = await loadTenantBundle(tenantId);
   if (!tenant) throw new Error("Tenant not found");
+  await writePlatformActiveTenantId(tenantId);
   return tenant;
+}
+
+export async function getTenantBySubscriptionExternalId(
+  externalId: string,
+): Promise<Tenant | null> {
+  if (!isRemoteDb()) {
+    return fileStore.getTenantBySubscriptionExternalId(externalId);
+  }
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("tenants")
+    .select("id")
+    .eq("subscription_external_id", externalId)
+    .maybeSingle();
+  if (error) throw error;
+  const row = data as { id: string } | null;
+  if (!row) return null;
+  return loadTenantBundle(row.id);
+}
+
+export async function getConversationByPaymentExternalId(
+  externalId: string,
+): Promise<Conversation | null> {
+  if (!isRemoteDb()) {
+    return fileStore.getConversationByPaymentExternalId(externalId);
+  }
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("conversations")
+    .select("*")
+    .eq("payment_external_id", externalId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return mapConversation(data as ConversationRow);
 }
 
 export async function createTenant(input: {
@@ -1036,6 +1122,7 @@ export async function updateConversation(
       payment_link_url: payment?.linkUrl ?? null,
       payment_status: payment?.status ?? "none",
       payment_provider: payment?.provider ?? null,
+      payment_external_id: payment?.externalId ?? null,
       agent,
       escalation,
     })

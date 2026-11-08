@@ -54,9 +54,21 @@ export default function BotPage() {
   async function checkout() {
     setLoading(true);
     setError(null);
-    const res = await fetch("/api/billing/checkout", { method: "POST" });
+    const res = await fetch("/api/billing/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
     const data = await res.json();
-    if (!res.ok) setError(data.error ?? "שגיאה");
+    if (!res.ok) {
+      setError(data.error ?? "שגיאה");
+      setLoading(false);
+      return;
+    }
+    if (typeof data.checkoutUrl === "string" && data.checkoutUrl) {
+      window.location.href = data.checkoutUrl;
+      return;
+    }
     await refresh();
     setLoading(false);
   }

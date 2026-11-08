@@ -8,6 +8,11 @@ import {
 } from "@/lib/store/db";
 import { outboundPeriod } from "@/lib/product/bot";
 import { currentPeriod, toE164Il } from "@/lib/product/model";
+import {
+  crossedSoftCap,
+  notifySoftCap,
+  outboundUsage,
+} from "@/lib/product/usage-caps";
 import { sendWhatsAppText } from "@/lib/whatsapp/client";
 import { Conversation, ProcessKey, Tenant } from "@/lib/types";
 import { handleIntake } from "@/lib/processes/waves/intake";
@@ -355,6 +360,7 @@ export async function handleInboundMessage(input: {
       tenant: input.tenant,
       conversation,
       inboundText: input.text,
+      metaMessageId: input.metaMessageId,
     });
     if (agent.handled) {
       result = {
@@ -420,10 +426,13 @@ export async function handleInboundMessage(input: {
 
   if (metered && result.replies.length > 0) {
     const period = currentPeriod();
-    const count =
-      (input.tenant.subscription.outboundPeriod === period
+    const previousCount =
+      input.tenant.subscription.outboundPeriod === period
         ? input.tenant.subscription.outboundCount
-        : 0) + result.replies.length;
+        : 0;
+    const count = previousCount + result.replies.length;
+    const cap =
+      input.tenant.subscription.monthlyOutboundCap || 1000;
     await updateTenant(input.tenant.id, {
       subscription: {
         ...input.tenant.subscription,
@@ -431,6 +440,21 @@ export async function handleInboundMessage(input: {
         outboundCount: count,
       },
     });
+    if (crossedSoftCap({ previousCount, nextCount: count, cap })) {
+      const usage = outboundUsage({
+        ...input.tenant,
+        subscription: {
+          ...input.tenant.subscription,
+          outboundPeriod: period,
+          outboundCount: count,
+        },
+      });
+      await notifySoftCap(input.tenant, usage);
+      result = {
+        ...result,
+        events: [...(result.events ?? []), "bot.soft_cap_alert"],
+      };
+    }
   }
 
   await persistEvents(input.tenant, conversation, result.events, channel);

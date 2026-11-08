@@ -30,7 +30,10 @@ export function agentDryRun(): boolean {
 }
 
 export function hasLlmKey(): boolean {
-  return Boolean(process.env.MOKED_LLM_API_KEY?.trim());
+  return Boolean(
+    process.env.MOKED_LLM_API_KEY?.trim() ||
+      process.env.OPENAI_API_KEY?.trim(),
+  );
 }
 
 /** Topics that always escalate (complaints / explicit person request). */

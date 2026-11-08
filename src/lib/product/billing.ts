@@ -1,39 +1,91 @@
-import { createHmac, timingSafeEqual } from "crypto";
+import {
+  providerMode,
+  pspWebhookSecret,
+  resolveBillingProvider,
+} from "@/lib/integrations/psp";
+import { getPsp } from "@/lib/integrations/get-psp";
 import { getTenantById, listPhoneNumbers, updateTenant } from "@/lib/store/db";
-import { subscriptionPriceIls } from "@/lib/product/model";
+import {
+  setupFeeIls,
+  subscriptionPriceIls,
+} from "@/lib/product/model";
 import { lockAvailableNumber, parkTenantNumber } from "@/lib/product/pool";
 
+/** Prefer PSP secret; keep BILLING_WEBHOOK_SECRET as legacy alias. */
 export function billingWebhookSecret(): string | null {
-  const secret = process.env.BILLING_WEBHOOK_SECRET?.trim();
-  return secret || null;
+  return (
+    pspWebhookSecret() ||
+    process.env.BILLING_WEBHOOK_SECRET?.trim() ||
+    null
+  );
 }
 
-export function verifyBillingSignature(rawBody: string, header: string | null): boolean {
-  const secret = billingWebhookSecret();
-  if (!secret || !header) return false;
-  const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
-  const left = Buffer.from(expected);
-  const right = Buffer.from(header.trim());
-  if (left.length !== right.length) return false;
-  return timingSafeEqual(left, right);
-}
+export type CheckoutPlan = "monthly" | "setup_plus_monthly";
 
-export async function startCheckout(tenantId: string) {
+/**
+ * SaaS card checkout (subscription / setup). Wave D customer payments stay
+ * behind MOKED_ENABLE_CUSTOMER_PAYMENTS and are not started here.
+ */
+export async function startCheckout(
+  tenantId: string,
+  opts?: { plan?: CheckoutPlan; includeSetupFee?: boolean },
+) {
   const tenant = await getTenantById(tenantId);
   if (!tenant) throw new Error("tenant_not_found");
-  const externalId = `checkout_${Date.now()}`;
+
+  const monthly = subscriptionPriceIls();
+  const includeSetup =
+    opts?.includeSetupFee === true || opts?.plan === "setup_plus_monthly";
+  const setup = includeSetup ? setupFeeIls() : 0;
+  const priceIls = monthly + setup;
+  const mode = providerMode();
+
+  if (mode !== "live") {
+    const externalId = `checkout_demo_${Date.now()}`;
+    const updated = await updateTenant(tenantId, {
+      subscription: {
+        ...tenant.subscription,
+        status: "pending",
+        externalId,
+        provider: "demo",
+      },
+    });
+    return {
+      status: "pending" as const,
+      priceIls,
+      monthlyIls: monthly,
+      setupIls: setup,
+      externalId,
+      checkoutUrl: null as string | null,
+      billingConnected: false,
+      tenant: updated,
+    };
+  }
+
+  const billingProvider = resolveBillingProvider();
+  const psp = getPsp(billingProvider);
+  const charge = await psp.createHostedCharge({
+    amountIls: priceIls,
+    description: setup
+      ? `MOKED setup ₪${setup} + subscription ₪${monthly} — ${tenant.businessName}`
+      : `MOKED subscription ₪${monthly} — ${tenant.businessName}`,
+    tenantId,
+  });
   const updated = await updateTenant(tenantId, {
     subscription: {
       ...tenant.subscription,
       status: "pending",
-      externalId,
-      provider: process.env.MOKED_BILLING_PROVIDER || undefined,
+      externalId: charge.externalId,
+      provider: charge.provider,
     },
   });
   return {
     status: "pending" as const,
-    priceIls: subscriptionPriceIls(),
-    externalId,
+    priceIls,
+    monthlyIls: monthly,
+    setupIls: setup,
+    externalId: charge.externalId,
+    checkoutUrl: charge.hostedUrl,
     billingConnected: Boolean(billingWebhookSecret()),
     tenant: updated,
   };
