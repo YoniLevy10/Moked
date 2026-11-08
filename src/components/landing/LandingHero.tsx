@@ -1,3 +1,4 @@
+import { subscriptionPriceIls } from "@/lib/product/fees";
 import {
   ArrowLeftIcon,
   CalendarIcon,
@@ -10,6 +11,8 @@ type LandingHeroProps = {
 };
 
 export function LandingHero({ whatsappHref }: LandingHeroProps) {
+  const monthlyIls = subscriptionPriceIls();
+
   return (
     <section aria-labelledby="hero-title" className="hero-section">
       <div className="landing-shell hero-grid">
@@ -43,6 +46,9 @@ export function LandingHero({ whatsappHref }: LandingHeroProps) {
             </a>
           </div>
 
+          <p className="hero-caption">
+            מנוי — {monthlyIls} ₪ לחודש
+          </p>
           <p className="hero-caption">
             <span aria-hidden="true" className="hero-caption__mark" />
             פחות פניות שנופלות בין הכיסאות. יותר שליטה בעסק.
