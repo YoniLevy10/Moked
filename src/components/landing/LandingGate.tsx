@@ -3,10 +3,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { subscriptionPriceIls } from "@/lib/product/fees";
 
 const PILOT_WA =
   process.env.NEXT_PUBLIC_PILOT_WHATSAPP || "972548102688";
 const WA_LINK = `https://wa.me/${PILOT_WA}?text=${encodeURIComponent("שלום, אשמח לפיילוט מוקד")}`;
+const SUBSCRIPTION_ILS = subscriptionPriceIls();
 
 const FIELDS = [
   "אחזקה ושיפוצים",
@@ -158,7 +160,7 @@ export function LandingGate() {
 
         <div className="actions">
           <Link className="cta" href="/login?next=/onboarding">
-            פותחים מנוי — 249 ₪ לחודש
+            פותחים מנוי — {SUBSCRIPTION_ILS} ₪ לחודש
           </Link>
           <a
             className="cta secondary"
