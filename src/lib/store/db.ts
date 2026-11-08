@@ -114,6 +114,10 @@ type MessageRow = {
   type: Message["type"];
   process_key: ProcessKey | null;
   meta_message_id: string | null;
+  delivered_at?: string | null;
+  read_at?: string | null;
+  failed_at?: string | null;
+  error_code?: string | null;
   created_at: string;
 };
 
@@ -307,6 +311,10 @@ function mapMessage(row: MessageRow): Message {
     type: row.type,
     processKey: row.process_key ?? undefined,
     metaMessageId: row.meta_message_id ?? undefined,
+    deliveredAt: row.delivered_at ?? undefined,
+    readAt: row.read_at ?? undefined,
+    failedAt: row.failed_at ?? undefined,
+    errorCode: row.error_code ?? undefined,
     createdAt: row.created_at,
   };
 }
@@ -1330,6 +1338,58 @@ export async function updatePhoneNumber(
     .single();
   if (error) throw new Error(error.message);
   return mapPhone(data as PhoneRow);
+}
+
+export async function claimWebhookEvent(input: {
+  id: string;
+  tenantId: string | null;
+  payload: Record<string, unknown>;
+}): Promise<boolean> {
+  if (!isRemoteDb()) return fileStore.claimWebhookEvent(input);
+  const sb = getSupabaseAdmin();
+  const existing = await sb
+    .from("webhook_events")
+    .select("id")
+    .eq("id", input.id)
+    .maybeSingle();
+  if (existing.error) throw existing.error;
+  if (existing.data) return false;
+  const { error } = await sb.from("webhook_events").insert({
+    id: input.id,
+    tenant_id: input.tenantId,
+    payload: input.payload,
+  });
+  if (error) {
+    // Unique race → treat as replay.
+    if (/duplicate|unique|conflict/i.test(error.message)) return false;
+    throw error;
+  }
+  return true;
+}
+
+export async function updateMessageDeliveryByMetaId(input: {
+  metaMessageId: string;
+  deliveredAt?: string;
+  readAt?: string;
+  failedAt?: string;
+  errorCode?: string;
+}): Promise<Message | null> {
+  if (!isRemoteDb()) return fileStore.updateMessageDeliveryByMetaId(input);
+  const sb = getSupabaseAdmin();
+  const patch: Record<string, unknown> = {};
+  if (input.deliveredAt !== undefined) patch.delivered_at = input.deliveredAt;
+  if (input.readAt !== undefined) patch.read_at = input.readAt;
+  if (input.failedAt !== undefined) patch.failed_at = input.failedAt;
+  if (input.errorCode !== undefined) patch.error_code = input.errorCode;
+  const { data, error } = await sb
+    .from("messages")
+    .update(patch)
+    .eq("meta_message_id", input.metaMessageId)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return mapMessage(data as MessageRow);
 }
 
 export function greetingFor(tenant: Tenant): string {

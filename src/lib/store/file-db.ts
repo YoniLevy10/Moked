@@ -19,6 +19,13 @@ import type { TenantKnowledgeRow } from "@/lib/agent/types";
 const DATA_DIR = path.join(process.cwd(), ".data");
 const DB_FILE = path.join(DATA_DIR, "db.json");
 
+export type WebhookEventRow = {
+  id: string;
+  tenantId: string | null;
+  payload: Record<string, unknown>;
+  processedAt: string;
+};
+
 export type DbShape = {
   tenants: Tenant[];
   conversations: Conversation[];
@@ -27,6 +34,7 @@ export type DbShape = {
   prospects: Prospect[];
   phoneNumbers: PhoneNumber[];
   tenantKnowledge: TenantKnowledgeRow[];
+  webhookEvents: WebhookEventRow[];
   templates: MessageTemplate[];
   activeTenantId: string | null;
 };
@@ -52,6 +60,7 @@ function emptyDb(): DbShape {
     prospects: [],
     phoneNumbers: [],
     tenantKnowledge: [],
+    webhookEvents: [],
     templates: [],
     activeTenantId: null,
   };
@@ -70,6 +79,7 @@ async function ensureDb(): Promise<DbShape> {
       prospects: parsed.prospects ?? [],
       phoneNumbers: parsed.phoneNumbers ?? [],
       tenantKnowledge: parsed.tenantKnowledge ?? [],
+      webhookEvents: parsed.webhookEvents ?? [],
       templates: parsed.templates ?? [],
     };
   } catch {
@@ -469,6 +479,12 @@ export async function addMessage(
   input: Omit<Message, "id" | "createdAt">,
 ): Promise<Message> {
   const db = await ensureDb();
+  if (
+    input.metaMessageId &&
+    db.messages.some((m) => m.metaMessageId === input.metaMessageId)
+  ) {
+    throw new Error("duplicate_meta_message_id");
+  }
   const message: Message = {
     ...input,
     id: nanoid(),
@@ -477,6 +493,47 @@ export async function addMessage(
   db.messages.push(message);
   await writeDb(db);
   return message;
+}
+
+export async function claimWebhookEvent(input: {
+  id: string;
+  tenantId: string | null;
+  payload: Record<string, unknown>;
+}): Promise<boolean> {
+  const db = await ensureDb();
+  if (db.webhookEvents.some((row) => row.id === input.id)) return false;
+  db.webhookEvents.push({
+    id: input.id,
+    tenantId: input.tenantId,
+    payload: input.payload,
+    processedAt: new Date().toISOString(),
+  });
+  await writeDb(db);
+  return true;
+}
+
+export async function updateMessageDeliveryByMetaId(input: {
+  metaMessageId: string;
+  deliveredAt?: string;
+  readAt?: string;
+  failedAt?: string;
+  errorCode?: string;
+}): Promise<Message | null> {
+  const db = await ensureDb();
+  const idx = db.messages.findIndex(
+    (m) => m.metaMessageId === input.metaMessageId,
+  );
+  if (idx < 0) return null;
+  const current = db.messages[idx];
+  db.messages[idx] = {
+    ...current,
+    deliveredAt: input.deliveredAt ?? current.deliveredAt,
+    readAt: input.readAt ?? current.readAt,
+    failedAt: input.failedAt ?? current.failedAt,
+    errorCode: input.errorCode ?? current.errorCode,
+  };
+  await writeDb(db);
+  return db.messages[idx];
 }
 
 export async function listConversations(tenantId: string): Promise<
