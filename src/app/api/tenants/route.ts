@@ -15,6 +15,11 @@ import {
   requireTenantContext,
   resolveTenantForUser,
 } from "@/lib/auth/tenant-context";
+import {
+  applyOwnerProfilePatch,
+  OwnerProfilePatchSchema,
+} from "@/lib/product/owner-profile";
+import { seedKnowledgeFromTenant } from "@/lib/agent/knowledge";
 
 export async function GET() {
   const user = await getSessionUser();
@@ -77,61 +82,17 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ tenant }, { status: 201 });
 }
 
-const PatchSchema = z.object({
-  integrations: z
-    .object({
-      googleCalendar: z.boolean().optional(),
-      paymentsProvider: z
-        .enum(["none", "demo", "grow", "payplus", "tranzila", "cardcom"])
-        .optional(),
-      invoicingProvider: z
-        .enum(["none", "icount", "morning", "greeninvoice"])
-        .optional(),
-      googleReviewsUrl: z.string().optional(),
-    })
-    .optional(),
-  availability: z
-    .object({
-      timezone: z.string().optional(),
-      windows: z
-        .array(
-          z.object({
-            day: z.number().int().min(0).max(6),
-            startHour: z.number().int().min(0).max(23),
-            endHour: z.number().int().min(1).max(24),
-          }),
-        )
-        .optional(),
-      dailyCapacity: z.number().int().min(0).optional(),
-    })
-    .optional(),
-});
+/** Owner + Managed share this PATCH — business, pricing, policy answers, hours. */
+const PatchSchema = OwnerProfilePatchSchema;
 
 export async function PATCH(req: NextRequest) {
   const ctx = await requireTenantContext();
   if (!ctx.ok) return ctx.response;
   const body = PatchSchema.parse(await req.json());
-  const tenant = await updateTenant(ctx.tenant.id, {
-    integrations: body.integrations
-      ? {
-          ...ctx.tenant.integrations,
-          ...body.integrations,
-        }
-      : undefined,
-    availability: body.availability
-      ? {
-          timezone:
-            body.availability.timezone ??
-            ctx.tenant.availability?.timezone ??
-            "Asia/Jerusalem",
-          windows:
-            body.availability.windows ?? ctx.tenant.availability?.windows ?? [],
-          dailyCapacity:
-            body.availability.dailyCapacity ??
-            ctx.tenant.availability?.dailyCapacity ??
-            0,
-        }
-      : undefined,
-  });
+  const patch = applyOwnerProfilePatch(ctx.tenant, body);
+  const tenant = await updateTenant(ctx.tenant.id, patch);
+  if (body.pricing || body.botAnswers) {
+    await seedKnowledgeFromTenant(tenant);
+  }
   return NextResponse.json({ tenant });
 }

@@ -131,6 +131,18 @@ export async function upsertTenantKnowledge(
   };
   if (!isRemote()) return fileStore.upsertTenantKnowledge(full);
   const sb = getRemote();
+  const existing = await sb
+    .from("tenant_knowledge")
+    .select("id, tenant_id")
+    .eq("id", full.id)
+    .maybeSingle();
+  if (existing.error) throw existing.error;
+  if (
+    existing.data &&
+    String((existing.data as { tenant_id: string }).tenant_id) !== full.tenantId
+  ) {
+    throw new Error("cross_tenant_knowledge");
+  }
   const { data, error } = await sb
     .from("tenant_knowledge")
     .upsert(
@@ -158,6 +170,23 @@ export async function upsertTenantKnowledge(
     meta: (saved.meta as Record<string, unknown>) ?? {},
     updatedAt: String(saved.updated_at),
   };
+}
+
+export async function deleteTenantKnowledge(
+  tenantId: string,
+  id: string,
+): Promise<boolean> {
+  if (!isRemote()) return fileStore.deleteTenantKnowledge(tenantId, id);
+  const sb = getRemote();
+  const { data, error } = await sb
+    .from("tenant_knowledge")
+    .delete()
+    .eq("id", id)
+    .eq("tenant_id", tenantId)
+    .select("id");
+  if (error) throw error;
+  const rows = (data ?? []) as Array<{ id: string }>;
+  return rows.length > 0;
 }
 
 /** Ensure pricing + bot.answers (+ trades pack FAQ) are mirrored into tenant_knowledge. */

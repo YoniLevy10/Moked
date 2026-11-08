@@ -479,10 +479,31 @@ export async function upsertTenantKnowledge(
 ): Promise<TenantKnowledgeRow> {
   const db = await ensureDb();
   const idx = db.tenantKnowledge.findIndex((r) => r.id === row.id);
-  if (idx >= 0) db.tenantKnowledge[idx] = row;
-  else db.tenantKnowledge.push(row);
+  if (idx >= 0) {
+    const existing = db.tenantKnowledge[idx];
+    if (existing.tenantId !== row.tenantId) {
+      throw new Error("cross_tenant_knowledge");
+    }
+    db.tenantKnowledge[idx] = row;
+  } else {
+    db.tenantKnowledge.push(row);
+  }
   await writeDb(db);
   return row;
+}
+
+export async function deleteTenantKnowledge(
+  tenantId: string,
+  id: string,
+): Promise<boolean> {
+  const db = await ensureDb();
+  const before = db.tenantKnowledge.length;
+  db.tenantKnowledge = db.tenantKnowledge.filter(
+    (row) => !(row.id === id && row.tenantId === tenantId),
+  );
+  if (db.tenantKnowledge.length === before) return false;
+  await writeDb(db);
+  return true;
 }
 
 export async function addMessage(
