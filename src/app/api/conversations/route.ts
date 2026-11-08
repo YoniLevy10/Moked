@@ -5,6 +5,7 @@ import {
   listMessages,
   updateConversation,
 } from "@/lib/store/db";
+import { conversationVisibleToTenant } from "@/lib/auth/conversation-access";
 import { requireTenantContext } from "@/lib/auth/tenant-context";
 import {
   maybeRenotifyEscalation,
@@ -18,6 +19,16 @@ export async function GET(req: NextRequest) {
   if (!ctx.ok) return ctx.response;
   const conversationId = req.nextUrl.searchParams.get("id");
   if (conversationId) {
+    const conversation = await getConversationById(conversationId);
+    if (
+      !conversationVisibleToTenant(
+        conversation,
+        ctx.tenant.id,
+        ctx.user.role,
+      )
+    ) {
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
     const messages = await listMessages(conversationId);
     return NextResponse.json({ messages });
   }

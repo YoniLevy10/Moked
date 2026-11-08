@@ -8,7 +8,7 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test --test-concurrency=1 src/**/*.test.ts",
+    "test": "tsx --test --test-concurrency=1 'src/**/*.test.ts'",
     "eval:agent": "tsx scripts/eval-agent.mjs",
     "dev:landing": "npm --prefix apps/landing run dev",
     "build:landing": "npm --prefix apps/landing run build",

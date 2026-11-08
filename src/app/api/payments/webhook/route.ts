@@ -7,17 +7,37 @@ import {
   updateConversation,
 } from "@/lib/store/db";
 import { createInvoiceDraft } from "@/lib/integrations/invoicing";
+import { verifyPaymentsSignature } from "@/lib/integrations/payment-webhook";
+import { customerPaymentsEnabled } from "@/lib/product/flags";
 
 /**
- * Wave D — payment provider webhook stub.
- * Providers (Grow/PayPlus/Tranzila/Cardcom) will POST here on payment success.
+ * Wave D — payment provider webhook.
+ * Requires PAYMENTS_WEBHOOK_SECRET + x-moked-signature HMAC.
+ * Fail-closed (410) when MOKED_ENABLE_CUSTOMER_PAYMENTS is not true.
  */
 export async function POST(req: NextRequest) {
-  const body = (await req.json()) as {
+  if (!customerPaymentsEnabled()) {
+    return NextResponse.json(
+      { error: "customer_payments_disabled" },
+      { status: 410 },
+    );
+  }
+
+  const raw = await req.text();
+  if (!verifyPaymentsSignature(raw, req.headers.get("x-moked-signature"))) {
+    return NextResponse.json({ error: "invalid_signature" }, { status: 401 });
+  }
+
+  let body: {
     conversationId?: string;
     status?: "paid" | "failed";
     amountIls?: number;
   };
+  try {
+    body = JSON.parse(raw) as typeof body;
+  } catch {
+    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+  }
 
   if (!body.conversationId) {
     return NextResponse.json({ error: "missing_conversationId" }, { status: 400 });
