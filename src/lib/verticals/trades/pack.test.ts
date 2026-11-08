@@ -5,7 +5,7 @@ import {
   applyTradesPackToTenant,
   tradesKnowledgeRows,
   tradesProcessPreset,
-} from "@/lib/trades/pack";
+} from "@/lib/verticals/trades/pack";
 import { proposeVisitSlots } from "@/lib/trades/slots";
 import { proposeSlots } from "@/lib/integrations/calendar";
 import { defaultAvailability, type Tenant } from "@/lib/types";

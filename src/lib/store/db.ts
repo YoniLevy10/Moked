@@ -584,9 +584,11 @@ export async function createTenant(input: {
   const created = data as { id: string };
   let tenant = await loadTenantBundle(created.id);
   if (!tenant) throw new Error("Tenant create failed");
-  if (input.vertical === "trades") {
-    const { applyTradesPackToTenant } = await import("@/lib/trades/pack");
-    const packed = applyTradesPackToTenant(tenant, input.tradeKind);
+  const { applyPackToTenant } = await import("@/lib/verticals/registry");
+  const packed = applyPackToTenant(tenant, input.vertical, {
+    niche: input.tradeKind,
+  });
+  if (packed !== tenant) {
     tenant = await updateTenant(tenant.id, {
       processes: packed.processes,
       pricing: packed.pricing,
