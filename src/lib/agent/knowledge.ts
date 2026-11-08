@@ -166,10 +166,12 @@ export async function seedKnowledgeFromTenant(
   tradeKind?: string | null,
 ): Promise<TenantKnowledgeRow[]> {
   const rows = knowledgeFromTenant(tenant);
-  if (tenant.vertical === "trades") {
-    const { tradesKnowledgeRows } = await import("@/lib/trades/pack");
-    rows.push(...tradesKnowledgeRows(tenant.id, tradeKind));
-  }
+  const { knowledgeSeedForVertical } = await import("@/lib/verticals/registry");
+  rows.push(
+    ...knowledgeSeedForVertical(tenant.vertical, tenant.id, {
+      niche: tradeKind,
+    }),
+  );
   const saved: TenantKnowledgeRow[] = [];
   for (const row of rows) {
     saved.push(await upsertTenantKnowledge(row));

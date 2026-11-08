@@ -161,10 +161,10 @@ export async function createTenant(input: {
     subscription: defaultSubscription(),
     bot: defaultBot(),
   };
-  if (input.vertical === "trades") {
-    const { applyTradesPackToTenant } = await import("@/lib/trades/pack");
-    tenant = applyTradesPackToTenant(tenant, input.tradeKind);
-  }
+  const { applyPackToTenant } = await import("@/lib/verticals/registry");
+  tenant = applyPackToTenant(tenant, input.vertical, {
+    niche: input.tradeKind,
+  });
   db.tenants.push(tenant);
   db.activeTenantId = tenant.id;
   await writeDb(db);

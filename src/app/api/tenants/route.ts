@@ -66,7 +66,8 @@ export async function POST(req: NextRequest) {
 
   const body = CreateSchema.parse(await req.json());
   const tenant = await createTenant(body);
-  if (tenant.vertical === "trades") {
+  const { resolveVerticalPack } = await import("@/lib/verticals/registry");
+  if (resolveVerticalPack(tenant.vertical)) {
     const { seedKnowledgeFromTenant } = await import("@/lib/agent/knowledge");
     await seedKnowledgeFromTenant(tenant, body.tradeKind);
   }
