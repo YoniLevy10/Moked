@@ -11,6 +11,7 @@ import {
   TenantKnowledgeRow,
 } from "@/lib/agent/types";
 import { proposeSlotsForTenant } from "@/lib/integrations/calendar";
+import { customerPaymentsEnabled } from "@/lib/product/flags";
 import { Conversation, ProcessKey, Tenant } from "@/lib/types";
 
 export type AgentToolName =
@@ -85,6 +86,8 @@ export const AGENT_TOOL_DEFINITIONS = [
         properties: {
           processKey: {
             type: "string",
+            // Wave D "payment" is omitted unless MOKED_ENABLE_CUSTOMER_PAYMENTS=true
+            // (enum filtered at execute time; keep listed only when enabled).
             enum: [
               "intake",
               "qualification",
@@ -92,7 +95,9 @@ export const AGENT_TOOL_DEFINITIONS = [
               "reminders",
               "retention",
               "quote",
-              "payment",
+              ...(process.env.MOKED_ENABLE_CUSTOMER_PAYMENTS === "true"
+                ? (["payment"] as const)
+                : []),
             ],
           },
         },
@@ -232,8 +237,8 @@ export async function executeAgentTool(
         "reminders",
         "retention",
         "quote",
-        "payment",
       ];
+      if (customerPaymentsEnabled()) allowed.push("payment");
       if (!allowed.includes(processKey)) {
         return {
           ok: false,

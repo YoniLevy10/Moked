@@ -165,19 +165,17 @@ export class TranzilaClient implements PspClient {
         null;
       if (!externalId) return null;
 
-      if (responseHash) {
-        const material =
-          String(body.sum ?? body.Sum ?? "") +
-          String(body.currency ?? body.Currency ?? "") +
-          String(body.Response ?? body.response ?? "") +
-          String(externalId);
-        const expected = createHmac("sha256", secret)
-          .update(material)
-          .digest("hex");
-        if (!safeEqualHex(expected, responseHash) && responseHash !== secret) {
-          return null;
-        }
-      } else if (!signatureHeader) {
+      // Require a real response_hash HMAC — never treat the raw secret as a hash.
+      if (!responseHash) return null;
+      const material =
+        String(body.sum ?? body.Sum ?? "") +
+        String(body.currency ?? body.Currency ?? "") +
+        String(body.Response ?? body.response ?? "") +
+        String(externalId);
+      const expected = createHmac("sha256", secret)
+        .update(material)
+        .digest("hex");
+      if (!safeEqualHex(expected, responseHash)) {
         return null;
       }
 
@@ -193,6 +191,8 @@ export class TranzilaClient implements PspClient {
         responseCode === "failed" ||
         responseCode === "canceled" ||
         responseCode === "past_due";
+      // Unknown response codes must not default to paid/active.
+      if (!paid && !failed) return null;
       const kind =
         body.kind === "billing" ||
         String(body.handshake_key ?? "").startsWith("tenant:")
@@ -202,15 +202,11 @@ export class TranzilaClient implements PspClient {
         ? kind === "billing"
           ? "active"
           : "paid"
-        : failed
-          ? responseCode === "past_due"
-            ? "past_due"
-            : responseCode === "canceled"
-              ? "canceled"
-              : "failed"
-          : kind === "billing"
-            ? "active"
-            : "paid";
+        : responseCode === "past_due"
+          ? "past_due"
+          : responseCode === "canceled"
+            ? "canceled"
+            : "failed";
       const eventId =
         (typeof body.event_id === "string" && body.event_id) ||
         (typeof body.Tempref === "string" && body.Tempref) ||

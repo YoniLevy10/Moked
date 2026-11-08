@@ -94,6 +94,62 @@ describe("getPsp factory", () => {
   });
 });
 
+describe("TranzilaClient webhook verify", () => {
+  it("rejects response_hash equal to the raw secret (no bypass)", () => {
+    process.env.PSP_WEBHOOK_SECRET = "secret";
+    const client = new TranzilaClient();
+    const body = JSON.stringify({
+      transaction_id: "tx_1",
+      Response: "000",
+      sum: "10",
+      currency: "1",
+      response_hash: "secret",
+      kind: "billing",
+    });
+    assert.equal(client.verifyWebhook(body, null), null);
+  });
+
+  it("rejects unknown response codes (no default paid/active)", () => {
+    process.env.PSP_WEBHOOK_SECRET = "secret";
+    const client = new TranzilaClient();
+    // material = sum + currency + Response + externalId
+    const material = "101999tx_2";
+    const response_hash = createHmac("sha256", "secret")
+      .update(material)
+      .digest("hex");
+    const body = JSON.stringify({
+      transaction_id: "tx_2",
+      Response: "999",
+      sum: "10",
+      currency: "1",
+      response_hash,
+      kind: "billing",
+    });
+    assert.equal(client.verifyWebhook(body, null), null);
+  });
+
+  it("accepts valid response_hash HMAC for known paid code", () => {
+    process.env.PSP_WEBHOOK_SECRET = "secret";
+    const client = new TranzilaClient();
+    const material = "101000tx_3";
+    const response_hash = createHmac("sha256", "secret")
+      .update(material)
+      .digest("hex");
+    const body = JSON.stringify({
+      transaction_id: "tx_3",
+      Response: "000",
+      sum: "10",
+      currency: "1",
+      response_hash,
+      kind: "billing",
+    });
+    const verified = client.verifyWebhook(body, null);
+    assert.ok(verified);
+    assert.equal(verified?.status, "active");
+    assert.equal(verified?.kind, "billing");
+  });
+});
+
 describe("TranzilaClient (mocked live charge)", () => {
   it("createHostedCharge posts handshake and builds hosted URL", async () => {
     process.env.TRANZILA_API_URL = "https://api.tranzila.test";
