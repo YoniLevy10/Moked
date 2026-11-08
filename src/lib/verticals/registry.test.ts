@@ -7,7 +7,9 @@ import {
   getVerticalPack,
   knowledgeSeedForVertical,
   listVerticalPacks,
+  qualificationQuestionsForVertical,
   resolveVerticalPack,
+  slotPolicyForVertical,
 } from "@/lib/verticals/registry";
 import { createTenant } from "@/lib/store/db";
 import { defaultAvailability, type Tenant } from "@/lib/types";
@@ -76,16 +78,46 @@ function baseTenant(): Tenant {
 }
 
 describe("vertical pack registry", () => {
-  it("resolves trades pack and no-ops for other", () => {
+  it("resolves trades + appointments; no-ops clinic/other", () => {
     const trades = resolveVerticalPack("trades");
     assert.ok(trades);
     assert.equal(trades.id, "trades");
-    assert.equal(trades.vertical, "trades");
     assert.equal(getVerticalPack("trades").id, "trades");
-    assert.equal(listVerticalPacks().length, 1);
+
+    const beauty = resolveVerticalPack("beauty");
+    assert.ok(beauty);
+    assert.equal(beauty.id, "appointments");
+    assert.equal(resolveVerticalPack("coach")?.id, "appointments");
+    assert.equal(getVerticalPack("appointments").id, "appointments");
+
+    assert.equal(listVerticalPacks().length, 2);
     assert.equal(resolveVerticalPack("other"), null);
     assert.equal(resolveVerticalPack("clinic"), null);
+    assert.equal(resolveVerticalPack("realty"), null);
     assert.equal(resolveVerticalPack(undefined), null);
+  });
+
+  it("slot policy: trades site visit, appointments in-place", () => {
+    assert.deepEqual(slotPolicyForVertical("trades"), {
+      model: "site_visit",
+      collectAddress: true,
+    });
+    assert.deepEqual(slotPolicyForVertical("beauty"), {
+      model: "appointment",
+      collectAddress: false,
+    });
+    assert.deepEqual(slotPolicyForVertical("other"), {
+      model: "site_visit",
+      collectAddress: true,
+    });
+    assert.match(
+      qualificationQuestionsForVertical("coach")[0] ?? "",
+      /תור/,
+    );
+    assert.match(
+      qualificationQuestionsForVertical("trades")[0] ?? "",
+      /ביקור/,
+    );
   });
 
   it("applyPackToTenant seeds trades knowledge/availability; other unchanged", () => {
@@ -108,6 +140,23 @@ describe("vertical pack registry", () => {
     assert.equal(other.vertical, "other");
     assert.deepEqual(other.availability, defaultAvailability());
     assert.deepEqual(knowledgeSeedForVertical("other", "t1"), []);
+  });
+
+  it("applyPackToTenant seeds appointments (beauty/coach) without clinics", () => {
+    const beauty = applyPackToTenant(baseTenant(), "beauty", {
+      niche: "beauty",
+    });
+    assert.equal(beauty.vertical, "beauty");
+    assert.ok(beauty.pricing.some((p) => /תספורת|מניקור|צבע/.test(p.name)));
+    assert.equal(beauty.availability.dailyCapacity, 10);
+    assert.equal(beauty.processes.payment.enabled, false);
+
+    const coach = applyPackToTenant(baseTenant(), "coach");
+    assert.equal(coach.vertical, "coach");
+    assert.ok(coach.pricing.some((p) => /אימון|מפגש|היכרות/.test(p.name)));
+
+    const rows = knowledgeSeedForVertical("beauty", "t1", { niche: "beauty" });
+    assert.ok(rows.some((r) => r.meta?.bookingModel === "appointment"));
   });
 
   it("creating trades tenant still seeds knowledge/availability as today", async () => {
@@ -139,5 +188,24 @@ describe("vertical pack registry", () => {
     });
     assert.equal(other.vertical, "other");
     assert.equal(other.availability.windows.length, 0);
+  });
+
+  it("creating beauty tenant seeds appointments pack", async () => {
+    delete process.env.DATABASE_URL;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    await resetFileDb();
+
+    const tenant = await createTenant({
+      businessName: "סטודיו נועה",
+      ownerName: "נועה",
+      phone: "0502222222",
+      vertical: "beauty",
+    });
+
+    assert.equal(tenant.vertical, "beauty");
+    assert.ok(tenant.availability.dailyCapacity >= 10);
+    assert.ok(tenant.pricing.some((p) => /תספורת|מניקור|צבע/.test(p.name)));
+    assert.equal(tenant.processes.booking.enabled, true);
+    assert.equal(tenant.processes.payment.enabled, false);
   });
 });

@@ -49,7 +49,16 @@ const CreateSchema = z.object({
     "other",
   ]),
   tradeKind: z
-    .enum(["renovation", "hvac", "electrical", "plumbing", "handyman"])
+    .enum([
+      "renovation",
+      "hvac",
+      "electrical",
+      "plumbing",
+      "handyman",
+      // Appointment niches (P2 pack) — reused as VerticalPackContext.niche
+      "beauty",
+      "coach",
+    ])
     .optional(),
 });
 
@@ -74,7 +83,12 @@ export async function POST(req: NextRequest) {
   const { resolveVerticalPack } = await import("@/lib/verticals/registry");
   if (resolveVerticalPack(tenant.vertical)) {
     const { seedKnowledgeFromTenant } = await import("@/lib/agent/knowledge");
-    await seedKnowledgeFromTenant(tenant, body.tradeKind);
+    const niche =
+      body.tradeKind ??
+      (tenant.vertical === "beauty" || tenant.vertical === "coach"
+        ? tenant.vertical
+        : undefined);
+    await seedKnowledgeFromTenant(tenant, niche);
   }
   await linkUserToTenant(user.id, tenant.id);
   // Refresh cookie role/tenant by re-setting session with updated tenantId

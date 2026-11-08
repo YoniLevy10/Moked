@@ -1,5 +1,6 @@
 import { ProcessContext, ProcessResult } from "@/lib/processes/types";
 import { greetingFor } from "@/lib/store/db";
+import { qualificationQuestionsForVertical } from "@/lib/verticals/registry";
 
 const SUPPORT_HINTS = [
   "תמיכה",
@@ -88,8 +89,9 @@ export function handleIntake(ctx: ProcessContext): ProcessResult {
   ];
 
   if (qualificationEnabled) {
+    const firstQ = qualificationQuestionsForVertical(ctx.tenant.vertical)[0];
     replies.push({
-      body: "מתי נוח שנתאם ביקור? (היום / מחר / השבוע / גמיש)",
+      body: firstQ,
       processKey: "qualification",
     });
   }

@@ -162,9 +162,12 @@ export async function createTenant(input: {
     bot: defaultBot(),
   };
   const { applyPackToTenant } = await import("@/lib/verticals/registry");
-  tenant = applyPackToTenant(tenant, input.vertical, {
-    niche: input.tradeKind,
-  });
+  const niche =
+    input.tradeKind ??
+    (input.vertical === "beauty" || input.vertical === "coach"
+      ? input.vertical
+      : undefined);
+  tenant = applyPackToTenant(tenant, input.vertical, { niche });
   db.tenants.push(tenant);
   db.activeTenantId = tenant.id;
   await writeDb(db);

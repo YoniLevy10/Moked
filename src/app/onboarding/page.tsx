@@ -6,6 +6,7 @@ import Link from "next/link";
 import { EmbeddedSignupButton } from "@/components/whatsapp/EmbeddedSignupButton";
 import { StepRail } from "@/components/onboarding/StepRail";
 import {
+  APPOINTMENT_KIND_OPTIONS,
   ONBOARDING_VERTICALS,
   TRADE_KIND_OPTIONS,
   type OnboardingStepId,
@@ -60,8 +61,9 @@ export default function OnboardingPage() {
     businessName: "",
     ownerName: "",
     phone: "",
-    vertical: "trades" as "trades" | "other",
+    vertical: "trades" as (typeof ONBOARDING_VERTICALS)[number]["id"],
     tradeKind: "plumbing" as (typeof TRADE_KIND_OPTIONS)[number]["id"],
+    appointmentKind: "beauty" as (typeof APPOINTMENT_KIND_OPTIONS)[number]["id"],
   });
   const [pricing, setPricing] = useState<PricingRow[]>([]);
   const [hours, setHours] = useState("");
@@ -146,10 +148,29 @@ export default function OnboardingPage() {
         setStep(3);
         return;
       }
+      // UI catalog uses "appointments"; API/DB store beauty|coach (pack aliases).
+      const payload =
+        form.vertical === "appointments"
+          ? {
+              businessName: form.businessName,
+              ownerName: form.ownerName,
+              phone: form.phone,
+              vertical: form.appointmentKind,
+              tradeKind: form.appointmentKind,
+            }
+          : {
+              businessName: form.businessName,
+              ownerName: form.ownerName,
+              phone: form.phone,
+              vertical: form.vertical,
+              ...(form.vertical === "trades"
+                ? { tradeKind: form.tradeKind }
+                : {}),
+            };
       const res = await fetch("/api/tenants", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -393,7 +414,7 @@ export default function OnboardingPage() {
         <div className="animate-rise space-y-6">
           <h1 className="display text-3xl font-bold">2 · בחירת תחום</h1>
           <p className="text-muted">
-            ברירות מחדל מגיעות מ־Vertical Pack. תורים יפתחו ב־P2.
+            ברירות מחדל מגיעות מ־Vertical Pack (בעלי מקצוע או תורים).
           </p>
           <div className="space-y-3">
             {ONBOARDING_VERTICALS.map((v) => (
@@ -402,12 +423,11 @@ export default function OnboardingPage() {
                 type="button"
                 disabled={!v.selectable}
                 onClick={() => {
-                  if (v.id === "trades") {
-                    setForm((f) => ({ ...f, vertical: "trades" }));
-                  }
+                  if (!v.selectable) return;
+                  setForm((f) => ({ ...f, vertical: v.id }));
                 }}
                 className={`w-full rounded-3xl border px-5 py-4 text-right transition ${
-                  form.vertical === "trades" && v.id === "trades"
+                  form.vertical === v.id
                     ? "border-brand bg-brand/10"
                     : "border-line bg-white/70"
                 } ${!v.selectable ? "cursor-not-allowed opacity-50" : ""}`}
@@ -442,12 +462,40 @@ export default function OnboardingPage() {
               </p>
             </label>
           ) : null}
+          {form.vertical === "appointments" ? (
+            <label className="block space-y-2">
+              <span className="text-sm font-medium">סוג עסק תורים</span>
+              <select
+                className={fieldClass}
+                value={form.appointmentKind}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    appointmentKind: e.target
+                      .value as typeof form.appointmentKind,
+                  }))
+                }
+              >
+                {APPOINTMENT_KIND_OPTIONS.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.labelHe}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted">
+                יופי ואימון בלבד — בלי קליניקות רפואיות. נשמר כ־beauty|coach.
+              </p>
+            </label>
+          ) : null}
           {error && <p className="text-sm text-danger">{error}</p>}
           <button
             type="button"
             className={primaryBtn}
             onClick={() => void createTenantWithVertical()}
-            disabled={loading || form.vertical !== "trades"}
+            disabled={
+              loading ||
+              (form.vertical !== "trades" && form.vertical !== "appointments")
+            }
           >
             {loading ? "יוצר עסק..." : "צור עסק עם ברירות מחדל מה־pack"}
           </button>

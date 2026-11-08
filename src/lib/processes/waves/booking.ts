@@ -1,17 +1,20 @@
 import { ProcessContext, ProcessResult } from "@/lib/processes/types";
 import { proposeSlotsForTenant } from "@/lib/integrations/calendar";
 import { listConversations } from "@/lib/store/db";
+import { slotPolicyForVertical } from "@/lib/verticals/registry";
 
 /**
  * Wave A booking:
  * 1) propose slots from tenant availability (hours + capacity)
  * 2) confirm slot
- * 3) collect address (MVP, matches live demo)
+ * 3) site_visit → collect address; appointment → confirm in-place (no address)
  */
 export async function handleBooking(ctx: ProcessContext): Promise<ProcessResult> {
   const state = ctx.conversation.processState ?? {};
   const booking = ctx.conversation.booking ?? {};
   const text = ctx.inboundText.trim();
+  const policy = slotPolicyForVertical(ctx.tenant.vertical);
+  const isAppointment = policy.model === "appointment";
 
   // Step 1 — offer slots
   if (!booking.proposedSlots?.length) {
@@ -25,7 +28,9 @@ export async function handleBooking(ctx: ProcessContext): Promise<ProcessResult>
         handled: true,
         replies: [
           {
-            body: "אין כרגע חלונות ביקור פתוחים ביומן העסק. בעל העסק יחזור אליך לתאם מועד.",
+            body: isAppointment
+              ? "אין כרגע תורים פנויים ביומן העסק. בעל העסק יחזור אליך לתאם מועד."
+              : "אין כרגע חלונות ביקור פתוחים ביומן העסק. בעל העסק יחזור אליך לתאם מועד.",
             processKey: "booking",
           },
         ],
@@ -64,6 +69,7 @@ export async function handleBooking(ctx: ProcessContext): Promise<ProcessResult>
           bookingOffered: true,
           bookingStep: "slot",
           slotStartsAt: slots.map((slot) => slot.startsAt),
+          bookingModel: policy.model,
         },
       },
       events: ["booking.proposed"],
@@ -96,6 +102,39 @@ export async function handleBooking(ctx: ProcessContext): Promise<ProcessResult>
       };
     }
 
+    // Appointment model — confirm in-place, skip street address.
+    if (!policy.collectAddress) {
+      return {
+        handled: true,
+        replies: [
+          {
+            body: `מצוין! התור נקבע ל־${confirmed}.\nנשלח תזכורת לפני המועד. בעל העסק רואה את התיאום בדשבורד.`,
+            processKey: "booking",
+          },
+        ],
+        conversationPatch: {
+          activeProcess: undefined,
+          booking: {
+            ...booking,
+            confirmedAt: confirmed,
+            startsAt,
+            reminder24Sent: false,
+            reminder2Sent: false,
+          },
+          processState: {
+            ...state,
+            slotConfirmed: confirmed,
+            startsAt,
+            bookingConfirmed: true,
+            bookingStep: "done",
+            bookingModel: policy.model,
+            waveADone: true,
+          },
+        },
+        events: ["booking.slot_chosen", "booking.confirmed", "wave_a.completed"],
+      };
+    }
+
     return {
       handled: true,
       replies: [
@@ -118,14 +157,15 @@ export async function handleBooking(ctx: ProcessContext): Promise<ProcessResult>
           bookingStep: "address",
           slotConfirmed: confirmed,
           startsAt,
+          bookingModel: policy.model,
         },
       },
       events: ["booking.slot_chosen"],
     };
   }
 
-  // Step 3 — address
-  if (state.bookingStep === "address" || !state.address) {
+  // Step 3 — address (site visit only)
+  if (policy.collectAddress && (state.bookingStep === "address" || !state.address)) {
     if (text.length < 4) {
       return {
         handled: true,
@@ -156,6 +196,7 @@ export async function handleBooking(ctx: ProcessContext): Promise<ProcessResult>
           address: text,
           bookingConfirmed: true,
           bookingStep: "done",
+          bookingModel: policy.model,
           waveADone: true,
         },
       },
@@ -167,7 +208,9 @@ export async function handleBooking(ctx: ProcessContext): Promise<ProcessResult>
     handled: true,
     replies: [
       {
-        body: `התור כבר סגור ל־${booking.confirmedAt}. אפשר לכתוב "הצעה" או "תשלום" אם צריך.`,
+        body: isAppointment
+          ? `התור כבר סגור ל־${booking.confirmedAt}. אפשר לכתוב "הצעה" אם צריך.`
+          : `התור כבר סגור ל־${booking.confirmedAt}. אפשר לכתוב "הצעה" או "תשלום" אם צריך.`,
         processKey: "booking",
       },
     ],

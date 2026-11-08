@@ -19,6 +19,10 @@ export const tradesVerticalPack: VerticalPack = {
   },
   processPreset: tradesProcessPreset,
   availabilityDefaults: defaultTradesAvailability,
+  slotPolicy: {
+    model: "site_visit",
+    collectAddress: true,
+  },
   classifierVocab: {
     problemReport: [
       "נזילה",
