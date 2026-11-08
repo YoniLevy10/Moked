@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantByPhoneNumberId } from "@/lib/store/db";
+import {
+  getTenantByPhoneNumberId,
+  hasLiveWhatsAppTenant,
+} from "@/lib/store/db";
 import { handleInboundMessage } from "@/lib/processes/engine";
 import { verifyMetaSignature } from "@/lib/whatsapp/client";
 import { parseInboundMessages } from "@/lib/whatsapp/webhook";
@@ -19,7 +22,12 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
   const signature = req.headers.get("x-hub-signature-256");
-  if (!verifyMetaSignature(rawBody, signature)) {
+  const liveTenant = await hasLiveWhatsAppTenant();
+  if (
+    !verifyMetaSignature(rawBody, signature, {
+      hasLiveWhatsAppTenant: liveTenant,
+    })
+  ) {
     return NextResponse.json({ error: "invalid_signature" }, { status: 401 });
   }
 

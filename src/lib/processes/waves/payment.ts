@@ -41,31 +41,24 @@ export function handlePayment(ctx: ProcessContext): ProcessResult {
   }
 
   if (ctx.conversation.payment?.status === "link_sent") {
+    // Customer "שילמתי" is acknowledgement only — never mark paid without PSP webhook.
     if (/שילמתי|שולם|paid/i.test(ctx.inboundText)) {
       return {
         handled: true,
         replies: [
           {
-            body: "תודה! התשלום התקבל. נשלח קבלה בהקדם.",
+            body: "קיבלנו. ברגע שהתשלום יאומת אצל ספק הסליקה נשלח אישור וקבלה.",
             processKey: "payment",
           },
         ],
-        conversationPatch: {
-          payment: { ...ctx.conversation.payment, status: "paid" },
-          activeProcess: undefined,
-          processState: {
-            ...ctx.conversation.processState,
-            paymentDone: true,
-          },
-        },
-        events: ["payment.paid"],
+        events: ["payment.pending_verification"],
       };
     }
     return {
       handled: true,
       replies: [
         {
-          body: `הקישור עדיין פעיל:\n${ctx.conversation.payment.linkUrl}\nלאחר התשלום כתוב/י "שילמתי".`,
+          body: `הקישור עדיין פעיל:\n${ctx.conversation.payment.linkUrl}\nלאחר התשלום כתוב/י "שילמתי" — האישור הסופי מגיע מספק הסליקה.`,
           processKey: "payment",
         },
       ],
@@ -84,7 +77,7 @@ export function handlePayment(ctx: ProcessContext): ProcessResult {
     handled: true,
     replies: [
       {
-        body: `לסיום — קישור לתשלום (₪${amount}):\n${link.url}\n\nאחרי התשלום השב/י "שילמתי".`,
+        body: `לסיום — קישור לתשלום (₪${amount}):\n${link.url}\n\nאחרי התשלום אפשר לכתוב "שילמתי"; האישור הסופי מגיע מספק הסליקה.`,
         processKey: "payment",
       },
     ],

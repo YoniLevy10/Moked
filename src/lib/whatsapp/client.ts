@@ -141,25 +141,33 @@ export function getEmbeddedSignupConfig() {
   };
 }
 
-/** Verify Meta X-Hub-Signature-256 when META_APP_SECRET is set. */
 /**
- * Meta webhook signature check.
- * Live (`MOKED_PROVIDER_MODE=live`): fail-closed without META_APP_SECRET.
- * Explicit local bypass: `MOKED_META_SIGNATURE_BYPASS=1` (never in production).
- * Demo without secret: soft-open for local smoke (legacy).
+ * Meta webhook signature check (X-Hub-Signature-256).
+ *
+ * Fail-closed without META_APP_SECRET whenever live traffic is possible:
+ * production, `MOKED_PROVIDER_MODE=live`, or when `hasLiveWhatsAppTenant` is true.
+ * Soft-open (unsigned accept) is removed — local demo must set
+ * `MOKED_META_SIGNATURE_BYPASS=1` explicitly (never default on; refused in prod/live).
  */
 export function verifyMetaSignature(
   rawBody: string,
   signatureHeader: string | null,
+  options?: { hasLiveWhatsAppTenant?: boolean },
 ): boolean {
-  if (process.env.MOKED_META_SIGNATURE_BYPASS === "1") return true;
+  const production = process.env.NODE_ENV === "production";
+  const liveMode = process.env.MOKED_PROVIDER_MODE?.trim() === "live";
+  const liveTrafficPossible =
+    production || liveMode || Boolean(options?.hasLiveWhatsAppTenant);
+
+  if (process.env.MOKED_META_SIGNATURE_BYPASS === "1") {
+    // Explicit local-only bypass — never honor when live traffic is possible.
+    return !liveTrafficPossible;
+  }
 
   const secret = process.env.META_APP_SECRET?.trim();
-  const live = process.env.MOKED_PROVIDER_MODE?.trim() === "live";
-
   if (!secret) {
-    // Fail closed in live; soft-open only outside live for local demo.
-    return !live;
+    // No soft-open: missing secret rejects unsigned ingest.
+    return false;
   }
   if (!signatureHeader?.startsWith("sha256=")) return false;
   const expected = createHmac("sha256", secret).update(rawBody).digest("hex");

@@ -499,6 +499,23 @@ export async function getTenantByPhoneNumberId(
   return loadTenantBundle(phoneRow.id);
 }
 
+/** True when any tenant is configured for live WhatsApp (signature must fail-closed). */
+export async function hasLiveWhatsAppTenant(): Promise<boolean> {
+  if (!isRemoteDb()) {
+    const db = await fileStore.getDb();
+    return db.tenants.some((t) => t.whatsapp.mode === "live");
+  }
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("tenants")
+    .select("id")
+    .eq("whatsapp_mode", "live")
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return Boolean(data);
+}
+
 export async function getConversationById(
   id: string,
 ): Promise<Conversation | null> {
