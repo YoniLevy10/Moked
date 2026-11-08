@@ -1,6 +1,9 @@
 @import "tailwindcss";
 
 :root {
+  /* Keep CSS var names used across the app; loaded via <link> in layout (not next/font). */
+  --font-heebo: "Heebo", "Segoe UI", sans-serif;
+  --font-rubik: "Rubik", "Heebo", "Segoe UI", sans-serif;
   --ink: #17251f;
   --muted: #edf2ee;
   --muted-foreground: #586a60;
