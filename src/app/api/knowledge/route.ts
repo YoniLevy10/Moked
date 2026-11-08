@@ -44,15 +44,22 @@ export async function POST(req: NextRequest) {
   const ctx = await requireTenantContext();
   if (!ctx.ok) return ctx.response;
   const body = UpsertSchema.parse(await req.json());
-  const row = await upsertTenantKnowledge({
-    id: body.id ?? newKnowledgeId(),
-    tenantId: ctx.tenant.id,
-    kind: body.kind,
-    label: body.label.trim(),
-    body: body.body.trim(),
-    meta: body.meta ?? {},
-  });
-  return NextResponse.json({ row }, { status: body.id ? 200 : 201 });
+  try {
+    const row = await upsertTenantKnowledge({
+      id: body.id ?? newKnowledgeId(),
+      tenantId: ctx.tenant.id,
+      kind: body.kind,
+      label: body.label.trim(),
+      body: body.body.trim(),
+      meta: body.meta ?? {},
+    });
+    return NextResponse.json({ row }, { status: body.id ? 200 : 201 });
+  } catch (error) {
+    if (error instanceof Error && error.message === "cross_tenant_knowledge") {
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
+    throw error;
+  }
 }
 
 export async function DELETE(req: NextRequest) {

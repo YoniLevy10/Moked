@@ -82,6 +82,46 @@ describe("knowledge CMS (owner + managed shared store)", () => {
     assert.ok(!after.some((r) => r.id === id));
   });
 
+  it("blocks cross-tenant knowledge upsert by id (IDOR)", async () => {
+    const a = await createTenant({
+      businessName: "א",
+      ownerName: "א",
+      phone: "0501111111",
+      vertical: "trades",
+    });
+    const b = await createTenant({
+      businessName: "ב",
+      ownerName: "ב",
+      phone: "0502222222",
+      vertical: "trades",
+    });
+    const id = newKnowledgeId("faq");
+    await upsertTenantKnowledge({
+      id,
+      tenantId: a.id,
+      kind: "faq",
+      label: "secret",
+      body: "רק ל-A",
+      meta: {},
+    });
+    await assert.rejects(
+      () =>
+        upsertTenantKnowledge({
+          id,
+          tenantId: b.id,
+          kind: "faq",
+          label: "hijack",
+          body: "גניבה",
+          meta: {},
+        }),
+      /cross_tenant_knowledge/,
+    );
+    const aRows = await listTenantKnowledge(a.id);
+    assert.equal(aRows.find((r) => r.id === id)?.body, "רק ל-A");
+    const bRows = await listTenantKnowledge(b.id);
+    assert.ok(!bRows.some((r) => r.id === id));
+  });
+
   it("pricing patch reseeds knowledge prices from catalog only", async () => {
     let tenant = await createTenant({
       businessName: "חשמל בדיקה",

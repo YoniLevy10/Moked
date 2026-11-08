@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   addMessage,
   getConversationById,
+  getTenantById,
   listConversations,
   listMessages,
   updateConversation,
@@ -50,21 +51,26 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ conversations, waitingForHuman: waiting });
 }
 
+const PatchSchema = z.object({
+  id: z.string().min(1),
+  status: z.enum(["open", "human_takeover", "closed"]).optional(),
+  action: z.enum(["takeover", "resolve"]).optional(),
+});
+
 export async function PATCH(req: NextRequest) {
   const ctx = await requireTenantContext();
   if (!ctx.ok) return ctx.response;
-  const body = (await req.json()) as {
-    id: string;
-    status?: "open" | "human_takeover" | "closed";
-    action?: "takeover" | "resolve";
-  };
+  const body = PatchSchema.parse(await req.json());
 
   const current = await getConversationById(body.id);
-  if (!current) {
+  if (
+    !conversationVisibleToTenant(current, ctx.tenant.id, ctx.user.role)
+  ) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
-  if (current.tenantId !== ctx.tenant.id && ctx.user.role !== "superadmin") {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  // Mutations stay on the active tenant — Managed must switch first.
+  if (!current || current.tenantId !== ctx.tenant.id) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
   let updated = current;
@@ -96,7 +102,14 @@ export async function POST(req: NextRequest) {
   ) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
-  if (!current) {
+  // Active-tenant bound: never send WhatsApp as a different tenant.
+  if (!current || current.tenantId !== ctx.tenant.id) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
+
+  const sendTenant =
+    (await getTenantById(current.tenantId)) ?? ctx.tenant;
+  if (sendTenant.id !== current.tenantId) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
@@ -106,14 +119,14 @@ export async function POST(req: NextRequest) {
   }
 
   const send = await sendWhatsAppText({
-    tenant: ctx.tenant,
+    tenant: sendTenant,
     to: conversation.customerWaId,
     body: body.body.trim(),
   });
 
   const message = await addMessage({
     conversationId: conversation.id,
-    tenantId: ctx.tenant.id,
+    tenantId: conversation.tenantId,
     direction: "outbound",
     body: body.body.trim(),
     type: "text",

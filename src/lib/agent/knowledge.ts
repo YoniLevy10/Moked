@@ -131,6 +131,18 @@ export async function upsertTenantKnowledge(
   };
   if (!isRemote()) return fileStore.upsertTenantKnowledge(full);
   const sb = getRemote();
+  const existing = await sb
+    .from("tenant_knowledge")
+    .select("id, tenant_id")
+    .eq("id", full.id)
+    .maybeSingle();
+  if (existing.error) throw existing.error;
+  if (
+    existing.data &&
+    String((existing.data as { tenant_id: string }).tenant_id) !== full.tenantId
+  ) {
+    throw new Error("cross_tenant_knowledge");
+  }
   const { data, error } = await sb
     .from("tenant_knowledge")
     .upsert(

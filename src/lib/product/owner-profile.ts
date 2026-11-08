@@ -18,7 +18,7 @@ export const OwnerProfilePatchSchema = z.object({
       z.object({
         id: z.string().optional(),
         name: z.string().min(1),
-        priceIls: z.number(),
+        priceIls: z.number().finite().nonnegative(),
         description: z.string().optional(),
       }),
     )

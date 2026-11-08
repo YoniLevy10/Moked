@@ -56,12 +56,7 @@ export async function POST() {
       whatsapp: { ...tenant.whatsapp, mode: "live" },
     });
   }
-
-  if (tenant.subscription.status !== "active") {
-    tenant = await updateTenant(id, {
-      subscription: { ...tenant.subscription, status: "active" },
-    });
-  }
+  // Never flip subscription.status here — billing webhook / checkout owns that.
 
   bustReadinessCache(id);
 

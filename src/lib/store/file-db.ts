@@ -479,8 +479,15 @@ export async function upsertTenantKnowledge(
 ): Promise<TenantKnowledgeRow> {
   const db = await ensureDb();
   const idx = db.tenantKnowledge.findIndex((r) => r.id === row.id);
-  if (idx >= 0) db.tenantKnowledge[idx] = row;
-  else db.tenantKnowledge.push(row);
+  if (idx >= 0) {
+    const existing = db.tenantKnowledge[idx];
+    if (existing.tenantId !== row.tenantId) {
+      throw new Error("cross_tenant_knowledge");
+    }
+    db.tenantKnowledge[idx] = row;
+  } else {
+    db.tenantKnowledge.push(row);
+  }
   await writeDb(db);
   return row;
 }
