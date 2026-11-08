@@ -55,12 +55,24 @@ export const AgentDecisionSchema = z.object({
 });
 export type AgentDecision = z.infer<typeof AgentDecisionSchema>;
 
+export type AgentTurnUsage = {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  costIls: number;
+  model?: string;
+};
+
 export type AgentTurnResult = {
   decision: AgentDecision;
   handled: boolean;
   replies: OutboundAction[];
   conversationPatch?: Partial<Conversation>;
   events?: string[];
+  /** Present when the LLM path ran (cost/token accounting). */
+  usage?: AgentTurnUsage;
+  /** Which path produced the decision. */
+  source?: "llm" | "classifier" | "passthrough";
 };
 
 /** Persisted on conversations.agent jsonb */

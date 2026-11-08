@@ -13,11 +13,18 @@ export function buildAgentPrompt(input: {
   stage?: string;
   askedSlots?: string[];
   forbidden?: string;
+  /**
+   * When true (LLM + tools path), omit catalog ₪ amounts from the prompt so
+   * prices must come from lookup_price / tool groundings only.
+   */
+  omitCatalogPrices?: boolean;
 }): string {
-  const prices = (input.tenant.pricing ?? [])
-    .map((p) => `${p.name}: ₪${p.priceIls}`)
-    .join("; ");
   const services = (input.tenant.pricing ?? []).map((p) => p.name).join(", ");
+  const prices = input.omitCatalogPrices
+    ? "(use lookup_price tool — do not invent)"
+    : (input.tenant.pricing ?? [])
+        .map((p) => `${p.name}: ₪${p.priceIls}`)
+        .join("; ");
   const hours = input.tenant.bot?.answers?.hours ?? "";
   const area =
     input.groundings.find((g) => g.source.startsWith("area"))?.text ?? "";

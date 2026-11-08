@@ -225,7 +225,20 @@ export default function OnboardingPage() {
         const data = await approve.json();
         throw new Error(data.error ?? "אישור הוראות נכשל");
       }
-      await fetch("/api/billing/checkout", { method: "POST" });
+      const checkoutRes = await fetch("/api/billing/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (checkoutRes.ok) {
+        const checkout = (await checkoutRes.json()) as {
+          checkoutUrl?: string | null;
+        };
+        if (checkout.checkoutUrl) {
+          window.location.href = checkout.checkoutUrl;
+          return;
+        }
+      }
       await loadTenant();
       setStep(5);
     } catch (err) {

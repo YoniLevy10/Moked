@@ -1,27 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
-import { applyBillingEvent, verifyBillingSignature } from "@/lib/product/billing";
+import { handlePspWebhook } from "@/lib/integrations/psp-webhook";
 
-const Body = z.object({
-  tenantId: z.string().min(1),
-  status: z.enum(["active", "past_due", "canceled"]),
-  externalId: z.string().optional(),
-  invoiceId: z.string().optional(),
-});
-
+/** SaaS subscription webhooks only — Wave D stays on /api/payments/webhook. */
 export async function POST(req: NextRequest) {
   const raw = await req.text();
-  if (!verifyBillingSignature(raw, req.headers.get("x-moked-signature"))) {
-    return NextResponse.json({ error: "invalid_signature" }, { status: 401 });
+  const result = await handlePspWebhook({
+    rawBody: raw,
+    signatureHeader: req.headers.get("x-moked-signature"),
+    preferredProvider: process.env.MOKED_BILLING_PROVIDER,
+  });
+
+  if (!result.ok) {
+    if (result.error === "invalid_signature") {
+      return NextResponse.json({ error: "invalid_signature" }, { status: 401 });
+    }
+    if (result.error === "not_found") {
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
+    if (result.error === "customer_payments_disabled") {
+      return NextResponse.json(
+        { error: "customer_payments_disabled" },
+        { status: 410 },
+      );
+    }
+    return NextResponse.json({ error: result.error }, { status: 400 });
   }
-  const parsed = Body.safeParse(JSON.parse(raw));
-  if (!parsed.success) {
-    return NextResponse.json({ error: "invalid_body" }, { status: 400 });
-  }
-  const result = await applyBillingEvent(parsed.data);
+
   return NextResponse.json({
-    status: result.tenant.subscription.status,
-    renewsAt: result.tenant.subscription.renewsAt ?? null,
-    numberStatus: result.number?.status ?? null,
+    ok: true,
+    replay: result.replay,
+    kind: result.replay ? undefined : result.kind,
+    status: result.replay ? undefined : result.status,
   });
 }
