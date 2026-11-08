@@ -1,27 +1,57 @@
 import { ProcessContext, ProcessResult } from "@/lib/processes/types";
-import { proposeSlots } from "@/lib/integrations/calendar";
+import { proposeSlotsForTenant } from "@/lib/integrations/calendar";
+import { listConversations } from "@/lib/store/db";
 
 /**
  * Wave A booking:
- * 1) propose slots
+ * 1) propose slots from tenant availability (hours + capacity)
  * 2) confirm slot
  * 3) collect address (MVP, matches live demo)
  */
-export function handleBooking(ctx: ProcessContext): ProcessResult {
+export async function handleBooking(ctx: ProcessContext): Promise<ProcessResult> {
   const state = ctx.conversation.processState ?? {};
   const booking = ctx.conversation.booking ?? {};
   const text = ctx.inboundText.trim();
 
   // Step 1 — offer slots
   if (!booking.proposedSlots?.length) {
-    const slots = proposeSlots();
+    const conversations = await listConversations(ctx.tenant.id);
+    const bookedStartsAt = conversations
+      .map((c) => c.booking?.startsAt)
+      .filter((iso): iso is string => Boolean(iso));
+    const slots = proposeSlotsForTenant(ctx.tenant, { bookedStartsAt });
+    if (slots.length === 0) {
+      return {
+        handled: true,
+        replies: [
+          {
+            body: "אין כרגע חלונות ביקור פתוחים ביומן העסק. בעל העסק יחזור אליך לתאם מועד.",
+            processKey: "booking",
+          },
+        ],
+        conversationPatch: {
+          activeProcess: "booking",
+          processState: {
+            ...state,
+            bookingOffered: true,
+            bookingStep: "no_availability",
+          },
+        },
+        events: ["booking.no_availability"],
+      };
+    }
     const prefer = typeof state.preferTime === "string" ? state.preferTime : "";
     const hint = prefer ? `\n(ציינת קודם: ${prefer})` : "";
+    const lines = slots
+      .map((slot, i) => `${i + 1}) ${slot.label}`)
+      .join("\n");
     return {
       handled: true,
       replies: [
         {
-          body: `אפשרויות קרובות:${hint}\n1) ${slots[0]?.label}\n2) ${slots[1]?.label}\n3) ${slots[2]?.label}\n\nהשב/י 1, 2 או 3 — או כתוב/י מועד אחר.`,
+          body: `אפשרויות קרובות:${hint}\n${lines}\n\nהשב/י ${slots
+            .map((_, i) => String(i + 1))
+            .join(", ")} — או כתוב/י מועד אחר.`,
           type: "interactive",
           processKey: "booking",
         },
@@ -42,7 +72,8 @@ export function handleBooking(ctx: ProcessContext): ProcessResult {
 
   // Step 2 — confirm slot (if not yet confirmed)
   if (!booking.confirmedAt) {
-    const idx = ["1", "2", "3"].includes(text) ? Number(text) - 1 : -1;
+    const choices = (booking.proposedSlots ?? []).map((_, i) => String(i + 1));
+    const idx = choices.includes(text) ? Number(text) - 1 : -1;
     const starts = Array.isArray(state.slotStartsAt) ? state.slotStartsAt : [];
     const confirmed =
       idx >= 0 && booking.proposedSlots
@@ -58,7 +89,7 @@ export function handleBooking(ctx: ProcessContext): ProcessResult {
         handled: true,
         replies: [
           {
-            body: "לא הצלחתי להבין את המועד. השב/י 1, 2 או 3 — או כתוב/י תאריך ושעה.",
+            body: `לא הצלחתי להבין את המועד. השב/י ${choices.join(", ")} — או כתוב/י תאריך ושעה.`,
             processKey: "booking",
           },
         ],

@@ -8,7 +8,7 @@ import {
 } from "@/lib/trades/pack";
 import { proposeVisitSlots } from "@/lib/trades/slots";
 import { proposeSlots } from "@/lib/integrations/calendar";
-import type { Tenant } from "@/lib/types";
+import { defaultAvailability, type Tenant } from "@/lib/types";
 
 function baseTenant(): Tenant {
   return {
@@ -26,6 +26,7 @@ function baseTenant(): Tenant {
       paymentsProvider: "none",
       invoicingProvider: "none",
     },
+    availability: defaultAvailability(),
     pricing: [],
     subscription: {
       status: "inactive",
@@ -79,11 +80,22 @@ describe("trades knowledge pack", () => {
 });
 
 describe("visit slot scheduler", () => {
-  it("proposes slots without Google Calendar", () => {
+  it("trades pack seeds availability; empty availability invents nothing", () => {
     const now = new Date("2026-11-08T08:00:00Z"); // Sunday
-    const slots = proposeVisitSlots(now, 3);
+    assert.deepEqual(proposeVisitSlots({ now, count: 3 }), []);
+    const packed = applyTradesPackToTenant(baseTenant(), "plumbing");
+    assert.ok(packed.availability.windows.length > 0);
+    assert.ok(packed.availability.dailyCapacity > 0);
+    const slots = proposeVisitSlots({
+      availability: packed.availability,
+      now,
+      count: 3,
+    });
     assert.equal(slots.length, 3);
     assert.ok(slots.every((s) => s.label && s.startsAt));
-    assert.deepEqual(proposeSlots(now), slots);
+    assert.deepEqual(
+      proposeSlots(packed.availability, { now, count: 3 }),
+      slots,
+    );
   });
 });

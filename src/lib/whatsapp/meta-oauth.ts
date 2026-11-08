@@ -58,6 +58,61 @@ export async function subscribeAppToWaba(
   }
 }
 
+export type SubscribedApp = { id: string; name?: string };
+
+/**
+ * List apps subscribed to a WABA (GET /{waba-id}/subscribed_apps).
+ * Used by live readiness — phone GET alone is not webhook evidence.
+ */
+export async function listWabaSubscribedApps(
+  wabaId: string,
+  accessToken: string,
+): Promise<{ ok: boolean; apps: SubscribedApp[]; detail?: string }> {
+  try {
+    const res = await fetch(`${GRAPH}/${wabaId}/subscribed_apps`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) {
+      return {
+        ok: false,
+        apps: [],
+        detail: `subscribed_apps_${res.status}`,
+      };
+    }
+    const data = (await res.json()) as {
+      data?: Array<{
+        whatsapp_business_api_data?: { id?: string; name?: string };
+        id?: string;
+      }>;
+    };
+    const apps: SubscribedApp[] = [];
+    for (const row of data.data ?? []) {
+      const id = row.whatsapp_business_api_data?.id ?? row.id;
+      if (!id) continue;
+      apps.push({
+        id,
+        name: row.whatsapp_business_api_data?.name,
+      });
+    }
+    return { ok: true, apps };
+  } catch (error) {
+    return {
+      ok: false,
+      apps: [],
+      detail: error instanceof Error ? error.message : "subscribed_apps_error",
+    };
+  }
+}
+
+/** True when META_APP_ID appears in the WABA subscribed_apps list. */
+export function isAppSubscribedToWaba(
+  apps: SubscribedApp[],
+  appId = process.env.META_APP_ID?.trim(),
+): boolean {
+  if (!appId) return false;
+  return apps.some((a) => a.id === appId);
+}
+
 /** Register the phone number for Cloud API messaging. */
 export async function registerCloudApiPhone(
   phoneNumberId: string,

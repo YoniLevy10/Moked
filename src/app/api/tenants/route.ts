@@ -89,6 +89,21 @@ const PatchSchema = z.object({
       googleReviewsUrl: z.string().optional(),
     })
     .optional(),
+  availability: z
+    .object({
+      timezone: z.string().optional(),
+      windows: z
+        .array(
+          z.object({
+            day: z.number().int().min(0).max(6),
+            startHour: z.number().int().min(0).max(23),
+            endHour: z.number().int().min(1).max(24),
+          }),
+        )
+        .optional(),
+      dailyCapacity: z.number().int().min(0).optional(),
+    })
+    .optional(),
 });
 
 export async function PATCH(req: NextRequest) {
@@ -96,10 +111,26 @@ export async function PATCH(req: NextRequest) {
   if (!ctx.ok) return ctx.response;
   const body = PatchSchema.parse(await req.json());
   const tenant = await updateTenant(ctx.tenant.id, {
-    integrations: {
-      ...ctx.tenant.integrations,
-      ...(body.integrations ?? {}),
-    },
+    integrations: body.integrations
+      ? {
+          ...ctx.tenant.integrations,
+          ...body.integrations,
+        }
+      : undefined,
+    availability: body.availability
+      ? {
+          timezone:
+            body.availability.timezone ??
+            ctx.tenant.availability?.timezone ??
+            "Asia/Jerusalem",
+          windows:
+            body.availability.windows ?? ctx.tenant.availability?.windows ?? [],
+          dailyCapacity:
+            body.availability.dailyCapacity ??
+            ctx.tenant.availability?.dailyCapacity ??
+            0,
+        }
+      : undefined,
   });
   return NextResponse.json({ tenant });
 }

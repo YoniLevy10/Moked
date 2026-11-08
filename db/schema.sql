@@ -57,6 +57,8 @@ create table public.tenants (
   payments_provider public.payments_provider not null default 'none',
   invoicing_provider public.invoicing_provider not null default 'none',
   google_reviews_url text,
+  -- Owner visit windows (day 0=Sun…6=Sat) + dailyCapacity; empty/0 = no inventable slots.
+  availability jsonb not null default '{"timezone":"Asia/Jerusalem","windows":[],"dailyCapacity":0}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

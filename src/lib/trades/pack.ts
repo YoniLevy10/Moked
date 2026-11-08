@@ -1,6 +1,7 @@
 import { nanoid } from "nanoid";
 import type { ProcessKey, Tenant } from "@/lib/types";
 import type { TenantKnowledgeRow } from "@/lib/agent/types";
+import { defaultTradesAvailability } from "@/lib/trades/slots";
 
 /** Beachhead trade niches — clinics out of scope for v1. */
 export type TradeKind =
@@ -203,6 +204,11 @@ export function applyTradesPackToTenant(
     ...tenant,
     vertical: "trades",
     processes: tradesProcessPreset(),
+    // Structured hours + capacity for slot proposals (Google Calendar = P2).
+    availability:
+      tenant.availability?.windows?.length && tenant.availability.dailyCapacity > 0
+        ? tenant.availability
+        : defaultTradesAvailability(),
     pricing: pack.pricing.map((p) => ({
       id: nanoid(8),
       name: p.name,

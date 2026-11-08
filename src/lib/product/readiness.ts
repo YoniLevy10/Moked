@@ -1,6 +1,10 @@
 import { MessageTemplate, Tenant } from "@/lib/types";
 import { getTenantById, listTemplatesForTenant } from "@/lib/store/db";
 import { getWhatsAppToken, isLiveWhatsApp } from "@/lib/whatsapp/client";
+import {
+  isAppSubscribedToWaba,
+  listWabaSubscribedApps,
+} from "@/lib/whatsapp/meta-oauth";
 
 export type ReadinessCheckId =
   | "whatsapp_connected"
@@ -35,8 +39,9 @@ export type ReadinessReport = {
  * - Still require: whatsapp_connected, subscription_active, bot_instructions_approved
  * - templates_approved only when reminders/retention are enabled
  *
- * Live mode runs the full Graph checks. Unit tests must not require network
- * in demo; live tests mock fetch.
+ * Live mode runs full Graph checks. Phone GET proves token + display name only;
+ * webhook_subscribed requires WABA subscribed_apps evidence for META_APP_ID.
+ * Unit tests must not require network in demo; live tests mock fetch.
  */
 
 const cache = new Map<string, { expires: number; report: ReadinessReport }>();
@@ -64,9 +69,8 @@ function templatesOk(templates: MessageTemplate[], tenant: Tenant): boolean {
   );
 }
 
-async function probeGraph(tenant: Tenant): Promise<{
+async function probePhoneNode(tenant: Tenant): Promise<{
   tokenValid: boolean;
-  webhookSubscribed: boolean;
   displayNameApproved: boolean;
   detail?: string;
 }> {
@@ -75,7 +79,6 @@ async function probeGraph(tenant: Tenant): Promise<{
   if (!token || !phoneNumberId) {
     return {
       tokenValid: false,
-      webhookSubscribed: false,
       displayNameApproved: false,
       detail: "missing_token_or_phone",
     };
@@ -88,7 +91,6 @@ async function probeGraph(tenant: Tenant): Promise<{
     if (!res.ok) {
       return {
         tokenValid: false,
-        webhookSubscribed: false,
         displayNameApproved: false,
         detail: `graph_${res.status}`,
       };
@@ -97,28 +99,66 @@ async function probeGraph(tenant: Tenant): Promise<{
       name_status?: string;
       verified_name?: string;
     };
-    const displayNameApproved =
-      data.name_status === "APPROVED" || Boolean(data.verified_name);
+    // verified_name alone must not green-light — require APPROVED name_status.
+    const displayNameApproved = data.name_status === "APPROVED";
     return {
       tokenValid: true,
-      webhookSubscribed: true,
       displayNameApproved,
+      detail: displayNameApproved
+        ? undefined
+        : `name_status_${data.name_status ?? "missing"}`,
     };
   } catch (error) {
     return {
       tokenValid: false,
-      webhookSubscribed: false,
       displayNameApproved: false,
       detail: error instanceof Error ? error.message : "graph_error",
     };
   }
 }
 
+async function probeWebhookSubscription(tenant: Tenant): Promise<{
+  webhookSubscribed: boolean;
+  detail?: string;
+}> {
+  const token = getWhatsAppToken(tenant);
+  const wabaId = tenant.whatsapp.wabaId;
+  if (!token || !wabaId) {
+    return {
+      webhookSubscribed: false,
+      detail: "missing_token_or_waba",
+    };
+  }
+  const appId = process.env.META_APP_ID?.trim();
+  if (!appId) {
+    return {
+      webhookSubscribed: false,
+      detail: "missing_meta_app_id",
+    };
+  }
+  const listed = await listWabaSubscribedApps(wabaId, token);
+  if (!listed.ok) {
+    return {
+      webhookSubscribed: false,
+      detail: listed.detail ?? "subscribed_apps_failed",
+    };
+  }
+  const subscribed = isAppSubscribedToWaba(listed.apps, appId);
+  return {
+    webhookSubscribed: subscribed,
+    detail: subscribed
+      ? undefined
+      : listed.apps.length === 0
+        ? "no_subscribed_apps"
+        : "app_not_in_subscribed_apps",
+  };
+}
+
 export async function evaluateReadiness(
   tenantId: string,
-  options?: { bypassCache?: boolean },
+  options?: { bypassCache?: boolean; forceLive?: boolean },
 ): Promise<ReadinessReport> {
-  if (!options?.bypassCache) {
+  if (!options?.bypassCache && !options?.forceLive) {
     const hit = cache.get(tenantId);
     if (hit && hit.expires > Date.now()) return hit.report;
   }
@@ -126,7 +166,7 @@ export async function evaluateReadiness(
   const tenant = await getTenantById(tenantId);
   if (!tenant) throw new Error("tenant_not_found");
 
-  const mode = providerMode();
+  const mode = options?.forceLive ? "live" : providerMode();
   const templates = await listTemplatesForTenant(tenantId);
   const checks: ReadinessCheck[] = [];
 
@@ -167,30 +207,33 @@ export async function evaluateReadiness(
   });
 
   if (mode === "live") {
-    const graph = await probeGraph(tenant);
+    const [phone, webhook] = await Promise.all([
+      probePhoneNode(tenant),
+      probeWebhookSubscription(tenant),
+    ]);
     checks.push({
       id: "token_valid",
       labelHe: "טוקן Meta תקף",
-      ok: graph.tokenValid && isLiveWhatsApp(tenant),
+      ok: phone.tokenValid && isLiveWhatsApp(tenant),
       blocking: true,
       fixHref: "/dashboard/connections",
-      detail: graph.detail,
+      detail: phone.detail,
     });
     checks.push({
       id: "webhook_subscribed",
       labelHe: "Webhook רשום",
-      ok: graph.webhookSubscribed,
+      ok: webhook.webhookSubscribed,
       blocking: true,
       fixHref: "/dashboard/connections",
-      detail: graph.detail,
+      detail: webhook.detail,
     });
     checks.push({
       id: "display_name_approved",
       labelHe: "שם תצוגה מאושר",
-      ok: graph.displayNameApproved,
+      ok: phone.displayNameApproved,
       blocking: true,
       fixHref: "/dashboard/connections",
-      detail: graph.detail,
+      detail: phone.detail,
     });
   }
 
@@ -202,7 +245,10 @@ export async function evaluateReadiness(
     checkedAt: new Date().toISOString(),
     checks,
   };
-  cache.set(tenantId, { expires: Date.now() + CACHE_MS, report });
+  // Only cache demo/provider-mode reports — go-live forceLive must stay fresh.
+  if (!options?.forceLive) {
+    cache.set(tenantId, { expires: Date.now() + CACHE_MS, report });
+  }
   return report;
 }
 

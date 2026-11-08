@@ -1,15 +1,18 @@
 import {
   BotAnswers,
   Conversation,
+  defaultAvailability,
   Message,
   PhoneNumber,
   PROCESS_CATALOG,
   ProcessKey,
   Subscription,
   Tenant,
+  TenantAvailability,
   VERTICALS,
 } from "@/lib/types";
 import { defaultBot, defaultSubscription } from "@/lib/product/model";
+import { normalizeAvailability } from "@/lib/trades/slots";
 import { BusinessEvent } from "@/lib/outcomes";
 import { Prospect, ProspectStatus, ProspectVertical } from "@/lib/prospects";
 import { getRemote, hasRemoteDb } from "@/lib/db/remote";
@@ -54,6 +57,7 @@ type TenantRow = {
   bot_answers?: Partial<BotAnswers> | null;
   bot_approved?: string | null;
   bot_approved_at?: string | null;
+  availability?: TenantAvailability | null;
 };
 
 type ProcessRow = {
@@ -204,6 +208,7 @@ function mapTenant(
       invoicingProvider: row.invoicing_provider,
       googleReviewsUrl: row.google_reviews_url ?? undefined,
     },
+    availability: normalizeAvailability(row.availability ?? defaultAvailability()),
     pricing: pricingRows.map((p) => ({
       id: p.id,
       name: p.name,
@@ -587,6 +592,7 @@ export async function createTenant(input: {
       pricing: packed.pricing,
       bot: packed.bot,
       integrations: packed.integrations,
+      availability: packed.availability,
     });
   }
   return tenant;
@@ -621,6 +627,16 @@ export async function updateTenant(
           : current.bot.answers,
       }
     : current.bot;
+  const availability = normalizeAvailability(
+    patch.availability
+      ? {
+          ...defaultAvailability(),
+          ...current.availability,
+          ...patch.availability,
+          windows: patch.availability.windows ?? current.availability?.windows ?? [],
+        }
+      : (current.availability ?? defaultAvailability()),
+  );
 
   const { error } = await sb
     .from("tenants")
@@ -639,6 +655,7 @@ export async function updateTenant(
       payments_provider: integrations.paymentsProvider,
       invoicing_provider: integrations.invoicingProvider,
       google_reviews_url: integrations.googleReviewsUrl ?? null,
+      availability,
       subscription_status: subscription.status,
       subscription_renews_at: subscription.renewsAt ?? null,
       subscription_provider: subscription.provider ?? null,
