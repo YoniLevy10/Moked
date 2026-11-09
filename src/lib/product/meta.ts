@@ -1,4 +1,6 @@
-const GRAPH = "https://graph.facebook.com/v21.0";
+import { META_GRAPH_BASE } from "@/lib/whatsapp/graph";
+
+const GRAPH = META_GRAPH_BASE;
 
 export function poolCredentials(): { wabaId: string; token: string } | null {
   const wabaId = process.env.META_WABA_ID?.trim();

@@ -133,7 +133,55 @@ describe("evaluateReadiness", () => {
     const report = await evaluateReadiness(tenant.id, { bypassCache: true });
     assert.equal(report.mode, "demo");
     assert.equal(report.ready, true);
+    assert.equal(report.demoReady, true);
+    assert.equal(report.liveReady, false);
     assert.ok(!report.checks.some((c) => c.id === "token_valid"));
+  });
+
+  it("live-test / demo simulation never yields liveReady under forceLive", async () => {
+    process.env.MOKED_PROVIDER_MODE = "demo";
+    process.env.META_APP_ID = "app_expected";
+    process.env.META_APP_SECRET = "sec";
+    process.env.META_EMBEDDED_SIGNUP_CONFIG_ID = "cfg";
+    process.env.META_WEBHOOK_VERIFY_TOKEN = "verify_prod_token";
+    const tenant = await createTenant({
+      businessName: "סימולציה",
+      ownerName: "בעלים",
+      phone: "0508888888",
+      vertical: "trades",
+    });
+    await connectWhatsAppDemo(tenant.id);
+    await updateTenant(tenant.id, {
+      subscription: { ...tenant.subscription, status: "active" },
+      bot: {
+        ...tenant.bot,
+        approved: "ok",
+        approvedAt: new Date().toISOString(),
+      },
+    });
+    bustReadinessCache(tenant.id);
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      new Response(
+        JSON.stringify({ name_status: "APPROVED", status: "CONNECTED" }),
+        { status: 200 },
+      )) as typeof fetch;
+    try {
+      const liveReport = await evaluateReadiness(tenant.id, {
+        bypassCache: true,
+        forceLive: true,
+      });
+      assert.equal(liveReport.mode, "live");
+      assert.equal(liveReport.liveReady, false);
+      assert.equal(liveReport.ready, false);
+      assert.ok(
+        liveReport.checks.some(
+          (c) => c.id === "live_channel_not_simulated" && !c.ok && c.blocking,
+        ),
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });
 
@@ -215,6 +263,9 @@ describe("live webhook_subscribed probe", () => {
   it("phone GET alone does not green webhook_subscribed", async () => {
     process.env.MOKED_PROVIDER_MODE = "live";
     process.env.META_APP_ID = "app_expected";
+    process.env.META_APP_SECRET = "sec";
+    process.env.META_EMBEDDED_SIGNUP_CONFIG_ID = "cfg";
+    process.env.META_WEBHOOK_VERIFY_TOKEN = "verify_prod_token";
     const tenant = await createTenant({
       businessName: "Webhook Probe",
       ownerName: "בעלים",
@@ -249,6 +300,7 @@ describe("live webhook_subscribed probe", () => {
         JSON.stringify({
           name_status: "APPROVED",
           verified_name: "Demo Biz",
+          status: "CONNECTED",
         }),
         { status: 200 },
       );
@@ -258,6 +310,7 @@ describe("live webhook_subscribed probe", () => {
       const report = await evaluateReadiness(tenant.id, { bypassCache: true });
       assert.equal(report.mode, "live");
       assert.equal(report.ready, false);
+      assert.equal(report.liveReady, false);
       const webhook = report.checks.find((c) => c.id === "webhook_subscribed");
       assert.ok(webhook);
       assert.equal(webhook!.ok, false);
@@ -273,6 +326,9 @@ describe("live webhook_subscribed probe", () => {
   it("ready when subscribed_apps includes META_APP_ID", async () => {
     process.env.MOKED_PROVIDER_MODE = "live";
     process.env.META_APP_ID = "app_expected";
+    process.env.META_APP_SECRET = "sec";
+    process.env.META_EMBEDDED_SIGNUP_CONFIG_ID = "cfg";
+    process.env.META_WEBHOOK_VERIFY_TOKEN = "verify_prod_token";
     const tenant = await createTenant({
       businessName: "Webhook OK",
       ownerName: "בעלים",
@@ -315,7 +371,11 @@ describe("live webhook_subscribed probe", () => {
         );
       }
       return new Response(
-        JSON.stringify({ name_status: "APPROVED", verified_name: "OK" }),
+        JSON.stringify({
+          name_status: "APPROVED",
+          verified_name: "OK",
+          status: "CONNECTED",
+        }),
         { status: 200 },
       );
     }) as typeof fetch;
@@ -323,6 +383,7 @@ describe("live webhook_subscribed probe", () => {
     try {
       const report = await evaluateReadiness(tenant.id, { bypassCache: true });
       assert.equal(report.ready, true);
+      assert.equal(report.liveReady, true);
       assert.ok(
         report.checks.every((c) => !c.blocking || c.ok),
         "all blocking checks green",
@@ -336,6 +397,9 @@ describe("live webhook_subscribed probe", () => {
   it("forceLive go-live path fails without subscribed_apps even in demo provider mode", async () => {
     process.env.MOKED_PROVIDER_MODE = "demo";
     process.env.META_APP_ID = "app_expected";
+    process.env.META_APP_SECRET = "sec";
+    process.env.META_EMBEDDED_SIGNUP_CONFIG_ID = "cfg";
+    process.env.META_WEBHOOK_VERIFY_TOKEN = "verify_prod_token";
     const tenant = await createTenant({
       businessName: "Go Live Gate",
       ownerName: "בעלים",

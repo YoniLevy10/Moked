@@ -1,6 +1,7 @@
 import { MessageTemplate, Tenant } from "@/lib/types";
 import { getTenantById, listTemplatesForTenant } from "@/lib/store/db";
 import { getWhatsAppToken, isLiveWhatsApp } from "@/lib/whatsapp/client";
+import { META_GRAPH_BASE } from "@/lib/whatsapp/graph";
 import {
   isAppSubscribedToWaba,
   listWabaSubscribedApps,
@@ -8,12 +9,15 @@ import {
 
 export type ReadinessCheckId =
   | "whatsapp_connected"
+  | "meta_creds_configured"
   | "subscription_active"
   | "bot_instructions_approved"
   | "templates_approved"
   | "token_valid"
+  | "phone_registered"
   | "webhook_subscribed"
-  | "display_name_approved";
+  | "display_name_approved"
+  | "live_channel_not_simulated";
 
 export type ReadinessCheck = {
   id: ReadinessCheckId;
@@ -26,7 +30,15 @@ export type ReadinessCheck = {
 
 export type ReadinessReport = {
   tenantId: string;
+  /** Ready for the evaluated mode (demo-relaxed or live). */
   ready: boolean;
+  /**
+   * Live Meta channel ready — all live blocking probes green.
+   * Never true from live-test / engine simulation / demo connect alone.
+   */
+  liveReady: boolean;
+  /** Demo path ready (no Graph probes required). */
+  demoReady: boolean;
   mode: "demo" | "live";
   checkedAt: string;
   checks: ReadinessCheck[];
@@ -34,19 +46,22 @@ export type ReadinessReport = {
 
 /**
  * Demo relaxed rules:
- * - Skip live Graph probes (token / webhook / display name)
+ * - Skip live Graph probes (token / webhook / display name / phone register)
  * - Never fail-closed on missing Meta number in demo
  * - Still require: whatsapp_connected, subscription_active, bot_instructions_approved
  * - templates_approved only when reminders/retention are enabled
  *
  * Live mode runs full Graph checks. Phone GET proves token + display name only;
  * webhook_subscribed requires WABA subscribed_apps evidence for META_APP_ID.
+ * liveReady is never set from live-test/engine simulation alone.
+ *
  * Unit tests must not require network in demo; live tests mock fetch.
  */
 
 const cache = new Map<string, { expires: number; report: ReadinessReport }>();
 const CACHE_MS = 5 * 60 * 1000;
 
+/** WhatsApp / Meta provider mode (independent of SaaS billingMode). */
 export function providerMode(): "demo" | "live" {
   return process.env.MOKED_PROVIDER_MODE?.trim() === "live" ? "live" : "demo";
 }
@@ -69,10 +84,32 @@ function templatesOk(templates: MessageTemplate[], tenant: Tenant): boolean {
   );
 }
 
+export function metaCredsConfigured(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return Boolean(
+    env.META_APP_ID?.trim() &&
+      env.META_APP_SECRET?.trim() &&
+      env.META_EMBEDDED_SIGNUP_CONFIG_ID?.trim() &&
+      env.META_WEBHOOK_VERIFY_TOKEN?.trim(),
+  );
+}
+
+function isSimulatedWhatsApp(tenant: Tenant): boolean {
+  const id = tenant.whatsapp.phoneNumberId ?? "";
+  return (
+    tenant.whatsapp.mode === "demo" ||
+    id.startsWith("demo_") ||
+    !tenant.whatsapp.accessToken
+  );
+}
+
 async function probePhoneNode(tenant: Tenant): Promise<{
   tokenValid: boolean;
   displayNameApproved: boolean;
+  phoneRegistered: boolean;
   detail?: string;
+  registerDetail?: string;
 }> {
   const token = getWhatsAppToken(tenant);
   const phoneNumberId = tenant.whatsapp.phoneNumberId;
@@ -80,39 +117,56 @@ async function probePhoneNode(tenant: Tenant): Promise<{
     return {
       tokenValid: false,
       displayNameApproved: false,
+      phoneRegistered: false,
       detail: "missing_token_or_phone",
+      registerDetail: "missing_token_or_phone",
     };
   }
   try {
     const res = await fetch(
-      `https://graph.facebook.com/v21.0/${phoneNumberId}?fields=display_phone_number,verified_name,name_status,quality_rating`,
+      `${META_GRAPH_BASE}/${phoneNumberId}?fields=display_phone_number,verified_name,name_status,quality_rating,status,code_verification_status`,
       { headers: { Authorization: `Bearer ${token}` } },
     );
     if (!res.ok) {
       return {
         tokenValid: false,
         displayNameApproved: false,
+        phoneRegistered: false,
         detail: `graph_${res.status}`,
+        registerDetail: `graph_${res.status}`,
       };
     }
     const data = (await res.json()) as {
       name_status?: string;
       verified_name?: string;
+      status?: string;
+      code_verification_status?: string;
     };
     // verified_name alone must not green-light — require APPROVED name_status.
     const displayNameApproved = data.name_status === "APPROVED";
+    // Cloud API usable when status is CONNECTED (registered).
+    const phoneRegistered =
+      typeof data.status === "string"
+        ? data.status.toUpperCase() === "CONNECTED"
+        : true; // older Graph responses may omit status — token GET success is weak evidence
     return {
       tokenValid: true,
       displayNameApproved,
+      phoneRegistered,
       detail: displayNameApproved
         ? undefined
         : `name_status_${data.name_status ?? "missing"}`,
+      registerDetail: phoneRegistered
+        ? undefined
+        : `phone_status_${data.status ?? "missing"}`,
     };
   } catch (error) {
     return {
       tokenValid: false,
       displayNameApproved: false,
+      phoneRegistered: false,
       detail: error instanceof Error ? error.message : "graph_error",
+      registerDetail: error instanceof Error ? error.message : "graph_error",
     };
   }
 }
@@ -152,6 +206,10 @@ async function probeWebhookSubscription(tenant: Tenant): Promise<{
         ? "no_subscribed_apps"
         : "app_not_in_subscribed_apps",
   };
+}
+
+function computeReady(checks: ReadinessCheck[]): boolean {
+  return checks.every((c) => !c.blocking || c.ok);
 }
 
 export async function evaluateReadiness(
@@ -206,7 +264,35 @@ export async function evaluateReadiness(
       : "לא חוסם — תהליכי תבנית כבויים",
   });
 
+  // Demo baseline (used for demoReady even when evaluating live).
+  const demoChecks = [...checks];
+  const demoReady = computeReady(demoChecks);
+
   if (mode === "live") {
+    const credsOk = metaCredsConfigured();
+    checks.push({
+      id: "meta_creds_configured",
+      labelHe: "משתני Meta מוגדרים",
+      ok: credsOk,
+      blocking: true,
+      fixHref: "/dashboard/connections",
+      detail: credsOk
+        ? undefined
+        : "חסרים META_APP_ID / META_APP_SECRET / META_EMBEDDED_SIGNUP_CONFIG_ID / META_WEBHOOK_VERIFY_TOKEN",
+    });
+
+    const simulated = isSimulatedWhatsApp(tenant);
+    checks.push({
+      id: "live_channel_not_simulated",
+      labelHe: "ערוץ חי (לא סימולציה)",
+      ok: !simulated && tenant.whatsapp.mode === "live",
+      blocking: true,
+      fixHref: "/dashboard/connections",
+      detail: simulated
+        ? "live-test / demo connect אינו LIVE_READY — יש להשלים Embedded Signup חי"
+        : undefined,
+    });
+
     const [phone, webhook] = await Promise.all([
       probePhoneNode(tenant),
       probeWebhookSubscription(tenant),
@@ -220,8 +306,16 @@ export async function evaluateReadiness(
       detail: phone.detail,
     });
     checks.push({
+      id: "phone_registered",
+      labelHe: "מספר רשום ב-Cloud API",
+      ok: phone.phoneRegistered && phone.tokenValid,
+      blocking: true,
+      fixHref: "/dashboard/connections",
+      detail: phone.registerDetail,
+    });
+    checks.push({
       id: "webhook_subscribed",
-      labelHe: "Webhook רשום",
+      labelHe: "Webhook רשום (subscribed_apps)",
       ok: webhook.webhookSubscribed,
       blocking: true,
       fixHref: "/dashboard/connections",
@@ -229,7 +323,7 @@ export async function evaluateReadiness(
     });
     checks.push({
       id: "display_name_approved",
-      labelHe: "שם תצוגה מאושר",
+      labelHe: "שם תצוגה מאושר (APPROVED)",
       ok: phone.displayNameApproved,
       blocking: true,
       fixHref: "/dashboard/connections",
@@ -237,10 +331,13 @@ export async function evaluateReadiness(
     });
   }
 
-  const ready = checks.every((c) => !c.blocking || c.ok);
+  const ready = computeReady(checks);
+  const liveReady = mode === "live" && ready;
   const report: ReadinessReport = {
     tenantId,
     ready,
+    liveReady,
+    demoReady,
     mode,
     checkedAt: new Date().toISOString(),
     checks,

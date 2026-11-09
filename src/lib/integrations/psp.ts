@@ -57,8 +57,23 @@ export interface PspClient {
   ): VerifiedPspWebhook | null;
 }
 
+/**
+ * SaaS billing mode — intentionally separate from WhatsApp live.
+ * `MOKED_PROVIDER_MODE=live` (WhatsApp) must NOT enable live card checkout.
+ * Set `MOKED_BILLING_MODE=live` (+ MOKED_BILLING_PROVIDER) for live PSP.
+ * Wave D customer payments stay behind MOKED_ENABLE_CUSTOMER_PAYMENTS.
+ */
+export function billingMode(): "demo" | "live" {
+  return process.env.MOKED_BILLING_MODE?.trim() === "live" ? "live" : "demo";
+}
+
+/**
+ * @deprecated Prefer billingMode() for PSP and providerMode() from readiness
+ * for WhatsApp. Kept as an alias of billingMode so existing billing imports
+ * do not silently re-couple to MOKED_PROVIDER_MODE.
+ */
 export function providerMode(): "demo" | "live" {
-  return process.env.MOKED_PROVIDER_MODE?.trim() === "live" ? "live" : "demo";
+  return billingMode();
 }
 
 /** Shared notify secret for demo + adapters that use HMAC body signing. */

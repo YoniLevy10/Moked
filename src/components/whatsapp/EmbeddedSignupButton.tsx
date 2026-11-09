@@ -1,6 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { parseEmbeddedSignupSession } from "@/lib/whatsapp/embedded-signup-session";
+import {
+  META_EMBEDDED_SIGNUP_VERSION,
+  META_GRAPH_VERSION,
+} from "@/lib/whatsapp/graph";
 
 type Props = {
   onConnected: () => void;
@@ -26,12 +31,7 @@ declare global {
   }
 }
 
-type SessionInfo = {
-  data?: Array<{
-    phone_number_id?: string;
-    waba_id?: string;
-  }>;
-};
+type SessionCapture = ReturnType<typeof parseEmbeddedSignupSession> | null;
 
 export function EmbeddedSignupButton({
   onConnected,
@@ -46,6 +46,7 @@ export function EmbeddedSignupButton({
     appId: string;
     configId: string;
     graphVersion: string;
+    embeddedSignupVersion: string;
     ready: boolean;
   } | null>(null);
 
@@ -63,7 +64,7 @@ export function EmbeddedSignupButton({
             appId: d.embeddedSignup.appId,
             autoLogAppEvents: true,
             xfbml: true,
-            version: d.embeddedSignup.graphVersion || "v21.0",
+            version: d.embeddedSignup.graphVersion || META_GRAPH_VERSION,
           });
           if (!cancelled) setReady(true);
         };
@@ -97,7 +98,7 @@ export function EmbeddedSignupButton({
     }
 
     setLoading(true);
-    let session: SessionInfo | null = null;
+    let session: SessionCapture = null;
 
     const onMessage = (event: MessageEvent) => {
       if (
@@ -109,27 +110,49 @@ export function EmbeddedSignupButton({
       try {
         const data =
           typeof event.data === "string" ? JSON.parse(event.data) : event.data;
-        if (data?.type === "WA_EMBEDDED_SIGNUP") {
-          session = data;
-        }
+        if (data?.type !== "WA_EMBEDDED_SIGNUP") return;
+        // Always capture — CANCEL/ERROR must block connect even if FB.login returns a code.
+        session = parseEmbeddedSignupSession(data);
       } catch {
         // ignore non-JSON
       }
     };
     window.addEventListener("message", onMessage);
 
+    const embeddedVersion =
+      config.embeddedSignupVersion || META_EMBEDDED_SIGNUP_VERSION;
+
     window.FB.login(
       async (response) => {
         window.removeEventListener("message", onMessage);
         try {
           const code = response.authResponse?.code;
-          const phoneNumberId = session?.data?.[0]?.phone_number_id;
-          const wabaId = session?.data?.[0]?.waba_id;
-          if (!code || !phoneNumberId || !wabaId) {
+          if (!code) {
             throw new Error(
-              "Embedded Signup לא הושלם — חסרים code / waba / phone",
+              "Embedded Signup לא הושלם — חסר code (ייתכן שסגרתם לפני Finish)",
             );
           }
+          if (!session) {
+            throw new Error(
+              "Embedded Signup לא הושלם — לא התקבלה הודעת session מ-Meta",
+            );
+          }
+          if (!session.ok) {
+            const map: Record<string, string> = {
+              cancelled: "ביטלתם את חיבור Meta",
+              error: session.detail ?? "שגיאה ב-Embedded Signup",
+              incomplete_no_phone:
+                "החיבור הסתיים בלי מספר טלפון — בחרו מספר WhatsApp והשלימו שוב",
+              missing_ids: "חסרים waba_id / phone_number_id מה-session",
+              unexpected_event: `אירוע Embedded Signup לא נתמך: ${session.detail ?? session.event}`,
+            };
+            throw new Error(
+              map[session.reason] ??
+                `Embedded Signup נכשל (${session.reason})`,
+            );
+          }
+
+          const { phoneNumberId, wabaId } = session.ids;
           const res = await fetch("/api/whatsapp/connect", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -155,10 +178,10 @@ export function EmbeddedSignupButton({
         config_id: config.configId,
         response_type: "code",
         override_default_response_type: true,
+        // v4: version in extras; do NOT send deprecated sessionInfoVersion (v2-era).
         extras: {
           setup: {},
-          featureType: "",
-          sessionInfoVersion: "3",
+          version: embeddedVersion,
         },
       },
     );

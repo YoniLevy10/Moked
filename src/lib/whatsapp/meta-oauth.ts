@@ -1,4 +1,7 @@
-const GRAPH = "https://graph.facebook.com/v21.0";
+import { randomInt } from "crypto";
+import { META_GRAPH_BASE } from "@/lib/whatsapp/graph";
+
+const GRAPH = META_GRAPH_BASE;
 
 export type EmbeddedSignupPayload = {
   code: string;
@@ -113,12 +116,121 @@ export function isAppSubscribedToWaba(
   return apps.some((a) => a.id === appId);
 }
 
-/** Register the phone number for Cloud API messaging. */
+export type RegisterPhoneResult = {
+  ok: true;
+  alreadyRegistered: boolean;
+  /** PIN used for register — never log in production handlers. */
+  pinUsed: string;
+};
+
+export class PhoneRegisterError extends Error {
+  readonly code:
+    | "pin_missing"
+    | "pin_invalid"
+    | "pin_mismatch"
+    | "register_failed";
+  readonly status?: number;
+  readonly graphBody?: string;
+
+  constructor(
+    code: PhoneRegisterError["code"],
+    message: string,
+    opts?: { status?: number; graphBody?: string },
+  ) {
+    super(message);
+    this.name = "PhoneRegisterError";
+    this.code = code;
+    this.status = opts?.status;
+    this.graphBody = opts?.graphBody;
+  }
+}
+
+const PIN_RE = /^\d{6}$/;
+
+/**
+ * Resolve the 6-digit Cloud API two-step PIN.
+ * Production requires META_PHONE_REGISTER_PIN (never hardcoded 123456).
+ * Non-production may generate a cryptographically random PIN when unset.
+ */
+export function resolveCloudApiRegisterPin(
+  explicitPin?: string,
+): string {
+  const fromArg = explicitPin?.trim();
+  if (fromArg) {
+    if (!PIN_RE.test(fromArg)) {
+      throw new PhoneRegisterError(
+        "pin_invalid",
+        "Cloud API register PIN must be exactly 6 digits",
+      );
+    }
+    return fromArg;
+  }
+
+  const fromEnv = process.env.META_PHONE_REGISTER_PIN?.trim();
+  if (fromEnv) {
+    if (!PIN_RE.test(fromEnv)) {
+      throw new PhoneRegisterError(
+        "pin_invalid",
+        "META_PHONE_REGISTER_PIN must be exactly 6 digits",
+      );
+    }
+    return fromEnv;
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    throw new PhoneRegisterError(
+      "pin_missing",
+      "META_PHONE_REGISTER_PIN is required in production (set a secure 6-digit PIN; do not use 123456)",
+    );
+  }
+
+  // Dev/test only — cryptographically random, never the historic 123456 default.
+  return String(randomInt(0, 1_000_000)).padStart(6, "0");
+}
+
+function classifyRegisterFailure(
+  status: number,
+  body: string,
+): PhoneRegisterError {
+  const lower = body.toLowerCase();
+  if (
+    /pin|two[- ]?step|verification/i.test(body) &&
+    /mismatch|incorrect|invalid|wrong|does not match/i.test(body)
+  ) {
+    return new PhoneRegisterError(
+      "pin_mismatch",
+      "Cloud API register failed: PIN mismatch. Set META_PHONE_REGISTER_PIN to the number's existing two-step PIN (or reset PIN in WhatsApp Manager).",
+      { status, graphBody: body },
+    );
+  }
+  return new PhoneRegisterError(
+    "register_failed",
+    `Cloud API register failed (${status}): ${body.slice(0, 280)}`,
+    { status, graphBody: body },
+  );
+}
+
+function isAlreadyRegistered(status: number, body: string): boolean {
+  if (/already\s*(registered|connected)|registered.*already/i.test(body)) {
+    return true;
+  }
+  // Meta sometimes returns 400 with a specific error subcode; keep text heuristic.
+  if (status === 400 && /133016|133010/i.test(body) === false) {
+    // 133010 = not registered (opposite). Don't treat as already.
+  }
+  return false;
+}
+
+/**
+ * Register the phone number for Cloud API messaging.
+ * Fail-closed on register failure (except already-registered → success).
+ */
 export async function registerCloudApiPhone(
   phoneNumberId: string,
   accessToken: string,
-  pin = "123456",
-): Promise<void> {
+  pin?: string,
+): Promise<RegisterPhoneResult> {
+  const resolvedPin = resolveCloudApiRegisterPin(pin);
   const res = await fetch(`${GRAPH}/${phoneNumberId}/register`, {
     method: "POST",
     headers: {
@@ -127,16 +239,20 @@ export async function registerCloudApiPhone(
     },
     body: JSON.stringify({
       messaging_product: "whatsapp",
-      pin,
+      pin: resolvedPin,
     }),
   });
-  // Already-registered numbers may return an error — treat as soft failure.
-  if (!res.ok) {
-    const err = await res.text();
-    if (!/already|registered/i.test(err)) {
-      console.warn("phone register warning:", err);
-    }
+
+  if (res.ok) {
+    return { ok: true, alreadyRegistered: false, pinUsed: resolvedPin };
   }
+
+  const err = await res.text();
+  if (isAlreadyRegistered(res.status, err)) {
+    return { ok: true, alreadyRegistered: true, pinUsed: resolvedPin };
+  }
+
+  throw classifyRegisterFailure(res.status, err);
 }
 
 export async function completeEmbeddedSignup(input: EmbeddedSignupPayload) {

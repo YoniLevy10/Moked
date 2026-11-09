@@ -6,7 +6,7 @@ import {
   setupFeeIls,
   subscriptionPriceIls,
 } from "@/lib/product/model";
-import { providerMode } from "@/lib/integrations/psp";
+import { billingMode } from "@/lib/integrations/psp";
 import { billingWebhookSecret } from "@/lib/product/billing";
 
 export async function GET() {
@@ -20,7 +20,7 @@ export async function GET() {
     bot: ctx.tenant.bot,
     number: number ? publicNumber(number, false) : null,
     billingConnected:
-      providerMode() === "live" && Boolean(billingWebhookSecret()),
+      billingMode() === "live" && Boolean(billingWebhookSecret()),
     metaConfigured: Boolean(
       process.env.META_WABA_ID && process.env.META_SYSTEM_USER_TOKEN,
     ),

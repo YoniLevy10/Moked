@@ -1,5 +1,5 @@
 import {
-  providerMode,
+  billingMode,
   pspWebhookSecret,
   resolveBillingProvider,
 } from "@/lib/integrations/psp";
@@ -38,7 +38,7 @@ export async function startCheckout(
     opts?.includeSetupFee === true || opts?.plan === "setup_plus_monthly";
   const setup = includeSetup ? setupFeeIls() : 0;
   const priceIls = monthly + setup;
-  const mode = providerMode();
+  const mode = billingMode();
 
   if (mode !== "live") {
     const externalId = `checkout_demo_${Date.now()}`;
