@@ -13,15 +13,25 @@ import {
   parseStatusUpdates,
   webhookIdempotencyKey,
 } from "@/lib/whatsapp/webhook";
+import { resolveWebhookVerifyToken } from "@/lib/whatsapp/webhook-verify";
 
 export async function GET(req: NextRequest) {
   const mode = req.nextUrl.searchParams.get("hub.mode");
   const token = req.nextUrl.searchParams.get("hub.verify_token");
   const challenge = req.nextUrl.searchParams.get("hub.challenge");
-  const verify =
-    process.env.META_WEBHOOK_VERIFY_TOKEN ?? "moked_dev_verify_token";
+  const verify = resolveWebhookVerifyToken();
+  if (!verify.ok) {
+    return NextResponse.json(
+      {
+        error: "verify_token_not_configured",
+        message:
+          "META_WEBHOOK_VERIFY_TOKEN must be set explicitly in production (not the insecure default)",
+      },
+      { status: 503 },
+    );
+  }
 
-  if (mode === "subscribe" && token === verify && challenge) {
+  if (mode === "subscribe" && token === verify.token && challenge) {
     return new NextResponse(challenge, { status: 200 });
   }
   return NextResponse.json({ error: "forbidden" }, { status: 403 });

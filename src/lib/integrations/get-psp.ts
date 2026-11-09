@@ -1,18 +1,19 @@
 import {
+  billingMode,
   DemoPspClient,
   normalizePspProvider,
-  providerMode,
   PspClient,
 } from "@/lib/integrations/psp";
 import { TranzilaClient } from "@/lib/integrations/tranzila";
 
 /**
- * Provider-agnostic factory. Demo mode → DemoPspClient.
- * Live mode → adapter for MOKED_BILLING_PROVIDER / preferred payments provider.
- * Adding Grow/PayPlus/Cardcom = new adapter file + one branch here.
+ * Provider-agnostic factory. Demo billing → DemoPspClient.
+ * Live billing requires MOKED_BILLING_MODE=live (independent of WhatsApp
+ * MOKED_PROVIDER_MODE) plus MOKED_BILLING_PROVIDER / preferred adapter.
+ * Wave D customer payments remain gated by MOKED_ENABLE_CUSTOMER_PAYMENTS.
  */
 export function getPsp(preferred?: string | null): PspClient {
-  if (providerMode() !== "live") return new DemoPspClient();
+  if (billingMode() !== "live") return new DemoPspClient();
   const provider = normalizePspProvider(
     preferred ?? process.env.MOKED_BILLING_PROVIDER,
   );

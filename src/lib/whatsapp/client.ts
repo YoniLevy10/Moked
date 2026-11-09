@@ -1,7 +1,12 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { Tenant } from "@/lib/types";
+import {
+  META_EMBEDDED_SIGNUP_VERSION,
+  META_GRAPH_BASE,
+  META_GRAPH_VERSION,
+} from "@/lib/whatsapp/graph";
 
-const GRAPH = "https://graph.facebook.com/v21.0";
+const GRAPH = META_GRAPH_BASE;
 
 export function getWhatsAppToken(tenant: Tenant): string | null {
   if (tenant.whatsapp.mode === "live" && tenant.whatsapp.accessToken) {
@@ -132,7 +137,9 @@ export function getEmbeddedSignupConfig() {
   return {
     appId: process.env.META_APP_ID ?? "",
     configId: process.env.META_EMBEDDED_SIGNUP_CONFIG_ID ?? "",
-    graphVersion: "v21.0",
+    graphVersion: META_GRAPH_VERSION,
+    /** extras.version for FB.login — v4; sessionInfoVersion intentionally omitted. */
+    embeddedSignupVersion: META_EMBEDDED_SIGNUP_VERSION,
     ready: Boolean(
       process.env.META_APP_ID &&
         process.env.META_APP_SECRET &&

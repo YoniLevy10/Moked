@@ -31,11 +31,12 @@
 
 ## Meta (מוצר חי)
 
-1. הגדירו ב־Vercel / `.env.local`: `META_APP_ID`, `META_APP_SECRET`, `META_EMBEDDED_SIGNUP_CONFIG_ID`, `META_WEBHOOK_VERIFY_TOKEN`
-2. ב־Meta App: Allowed domains + Webhook → `https://…/api/whatsapp/webhook`
-3. בדשבורד → חיבורים → **חבר WhatsApp חי (Embedded Signup)**
+1. הגדירו ב־Vercel / `.env.local`: `META_APP_ID`, `META_APP_SECRET`, `META_EMBEDDED_SIGNUP_CONFIG_ID`, `META_WEBHOOK_VERIFY_TOKEN` (לא ברירת־מחדל בפרוד), `META_PHONE_REGISTER_PIN`
+2. WhatsApp חי = `MOKED_PROVIDER_MODE=live` — נפרד מבילינג (`MOKED_BILLING_MODE`, ברירת מחדל demo). תשלומי לקוח נשארים כבויים.
+3. ב־Meta App: Login for Business config **v4** + Allowed domains + Webhook → `https://…/api/whatsapp/webhook`
+4. בדשבורד → חיבורים → **חבר WhatsApp חי (Embedded Signup)**
 
-דמו נשאר זמין לפיתוח בלי Meta.
+דמו נשאר זמין לפיתוח בלי Meta. ראו `audits/MOKED_META_RELEASE_READINESS.md`.
 
 ---
 

@@ -1,8 +1,9 @@
 import { Tenant } from "@/lib/types";
 import { getWhatsAppToken } from "@/lib/whatsapp/client";
 import { providerMode } from "@/lib/product/readiness";
+import { META_GRAPH_BASE } from "@/lib/whatsapp/graph";
 
-const GRAPH = "https://graph.facebook.com/v21.0";
+const GRAPH = META_GRAPH_BASE;
 
 export type GraphTemplateCreateResult = {
   metaId: string;

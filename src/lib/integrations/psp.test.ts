@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { createHmac } from "crypto";
 import {
+  billingMode,
   DemoPspClient,
   providerMode,
   signPspWebhook,
@@ -76,19 +77,29 @@ describe("DemoPspClient", () => {
 
 describe("getPsp factory", () => {
   it("returns DemoPspClient by default", () => {
+    delete process.env.MOKED_BILLING_MODE;
     delete process.env.MOKED_PROVIDER_MODE;
     assert.ok(getPsp() instanceof DemoPspClient);
     assert.equal(providerMode(), "demo");
   });
 
-  it("returns TranzilaClient when live + tranzila", () => {
+  it("WhatsApp live (MOKED_PROVIDER_MODE) does not enable live billing", () => {
     process.env.MOKED_PROVIDER_MODE = "live";
+    delete process.env.MOKED_BILLING_MODE;
+    process.env.MOKED_BILLING_PROVIDER = "tranzila";
+    assert.ok(getPsp() instanceof DemoPspClient);
+    assert.equal(billingMode(), "demo");
+    assert.equal(providerMode(), "demo");
+  });
+
+  it("returns TranzilaClient when billing live + tranzila", () => {
+    process.env.MOKED_BILLING_MODE = "live";
     process.env.MOKED_BILLING_PROVIDER = "tranzila";
     assert.ok(getPsp() instanceof TranzilaClient);
   });
 
   it("throws for unimplemented live adapters", () => {
-    process.env.MOKED_PROVIDER_MODE = "live";
+    process.env.MOKED_BILLING_MODE = "live";
     process.env.MOKED_BILLING_PROVIDER = "grow";
     assert.throws(() => getPsp(), /psp_adapter_unavailable:grow/);
   });
