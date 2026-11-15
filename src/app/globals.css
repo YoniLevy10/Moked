@@ -1402,6 +1402,70 @@ a {
   flex: 0 0 auto;
 }
 
+.legal-page__main {
+  padding-block: 2.5rem 4rem;
+}
+
+.legal-page__header {
+  margin-bottom: 2rem;
+}
+
+.legal-page__header h1 {
+  margin: 0.35rem 0 0.5rem;
+  color: var(--ink);
+  font-family: var(--font-rubik), var(--font-heebo), sans-serif;
+  font-size: clamp(1.75rem, 3vw, 2.35rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+.legal-page__meta {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 0.9rem;
+}
+
+.legal-page__body {
+  max-width: 42rem;
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.legal-page__body section + section {
+  margin-top: 1.75rem;
+}
+
+.legal-page__body h2 {
+  margin: 0 0 0.55rem;
+  color: var(--brand-deep);
+  font-family: var(--font-rubik), var(--font-heebo), sans-serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.legal-page__body p,
+.legal-page__body ul {
+  margin: 0 0 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.legal-page__body ul {
+  padding-inline-start: 1.25rem;
+}
+
+.legal-page__body li + li {
+  margin-top: 0.4rem;
+}
+
+.legal-page__body a {
+  color: var(--brand-deep);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
 .site-footer {
   border-top: 1px solid var(--line);
   background: #fff;

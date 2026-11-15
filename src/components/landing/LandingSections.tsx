@@ -267,6 +267,8 @@ export function LandingFooter() {
           <a href="#how-it-works">איך זה עובד</a>
           <a href="#capabilities">מה מוקד עושה</a>
           <a href="#contact">דברו איתנו</a>
+          <Link href="/privacy">מדיניות פרטיות</Link>
+          <Link href="/terms">תנאי שימוש</Link>
           <Link href="/login?next=/dashboard">כניסה לאזור האישי</Link>
         </nav>
 
